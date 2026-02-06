@@ -87,6 +87,11 @@ class TimeBlockingScheduler:
 
 class FocusModeTimer:
     # This class is responsible for implementing a focus mode timer to help users stay focused on their tasks
+    # We are creating a Pomodoro style timer
+    # It breaks work into 25 minute "work" intervals with 5 minute breaks in between. 
+    # After four "Pomodoros", the user takes a longer break of 15-30 minutes. Maybe we can let them set this one
+
+
     pass
 
 class DistractionBlocker:
