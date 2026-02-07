@@ -95,33 +95,119 @@ class FocusModeTimer:
         self.work_sec = work_min * 60
         self.break_sec = break_min * 60
         self.reps = 0
+        self.current_time = 0
+        self.running = False
+        self.after_id = None
 
-    def start_session(self, duration, label="Work"):
-        print(f"\n--- {label} Session Started ---")
-        while duration > 0:
-            mins, secs = divmod(duration, 60)
-            # \r returns the cursor to the start of the line
-            print(f"Time Remaining: {mins:02d}:{secs:02d}", end="\r")
-            time.sleep(1)
-            duration -= 1
-        print(f"\n{label} session complete!")
+        self.window = tk.Tk()
+        self.window.title("Go!")
+        self.window.geometry("600x400+0+0")
 
-    def run(self):
-        try:
-            while True:
-                self.start_session(self.work_sec, "Work")
+        self.label = tk.Label(self.window, text="Ready?", font=("Comic Sans MS", 24))
+        self.label.pack(pady=20)
+
+        # Start and timer share the same frame
+        stack = tk.Frame(self.window, width=300, height=150)
+        stack.pack(pady=50)
+        stack.pack_propagate(False)
+
+        self.timer_text = tk.Label(stack, text="00:00", font=("Comic Sans MS", 48))
+        self.timer_text.place_forget()
+
+        self.start_button = tk.Button(stack, text="Start", command=self.start_work, font=("Comic Sans MS", 30))
+        self.start_button.place(x=70, y=0)
+        
+        self.pause_button = tk.Button(stack, text="Pause", command=self.pause, font=("Comic Sans MS", 12))
+        self.pause_button.place_forget
+        self.continue_button = tk.Button(stack, text="Continue", command=self.cont, font=("Comic Sans MS", 12))
+        self.continue_button.place_forget
+        self.reset_button = tk.Button(stack, text="End timer", command=self.stop, font=("Comic Sans MS", 12))
+        self.reset_button.place_forget
+
+        self.window.mainloop()
+
+    def start_work(self):
+        if not self.running:
+            self.running = True
+            self.current_time = self.work_sec
+            self.label.config(text="Go!")
+            self.label.place(x=0, y=0, width=600, height=60)
+
+            self.timer_text.place(x=60, y=0)
+            self.pause_button.place(x=60, y=100)
+            self.reset_button.place(x=150, y=100)
+            self.start_button.place_forget()
+            
+            self.countdown()
+
+    def start_break(self):
+        self.current_time = self.break_sec
+        self.label.config(text="Break time!")
+        self.label.place(x=0, y=0, width=600, height=60)
+
+
+        self.countdown()
+
+    def countdown(self):
+        mins, secs = divmod(self.current_time, 60)
+        self.timer_text.config(text=f"{mins:02d}:{secs:02d}")
+
+        if self.running and self.current_time > 0:
+            self.current_time -= 1
+            self.after_id = self.window.after(1000, self.countdown)
+            return
+
+        if self.current_time == 0:
+            if self.label.cget("text") == "Go!":
+                self.label.place(x=0, y=0, width=600, height=60)
+
+
                 self.reps += 1
-                print(f"Total sessions completed: {self.reps}")
-                
-                self.start_session(self.break_sec, "Break")
-        except KeyboardInterrupt:
-            print("\nTimer stopped. Great work today!")
+                self.start_break()
+            else:
+                self.running = False
+                self.label.config(text=f"Blocks finished: {self.reps}")
+                self.label.place(x=0, y=0, width=600, height=60)
+
+
+
+    def pause(self):        # should a pomodoro timer have a pause button?
+        if self.running:
+            self.running = False
+            if self.after_id:
+                self.window.after_cancel(self.after_id)
+
+            self.label.config(text="Take a moment, we all need them", font=("Comic Sans MS", 20))
+            self.label.place(x=0, y=0, width=600, height=60)
+
+            self.continue_button.place(x=60, y=100)
+
+    def cont(self):
+        if not self.running:
+            self.running = True
+            self.label.config(text="Keep going!", font=("Comic Sans MS", 20))
+            self.label.place(x=0, y=0, width=600, height=60)
+
+            self.continue_button.place_forget()
+            self.countdown()
+
+    def stop(self):
+        self.running = False
+        if self.after_id:
+            self.window.after_cancel(self.after_id)
+
+        self.current_time = 0
+        self.label.config(text="Ready?")
+        self.label.place(x=0, y=0, width=600, height=60)
+
+        self.timer_text.config(text="00:00")
+
+
 
 # --- Execution ---
 if __name__ == "__main__":
     # You can now customize times easily when you create the object
-    timer = FocusModeTimer(work_min=25, break_min=5)
-    timer.run()
+    timer = FocusModeTimer(break_min=5)
 
     pass
 
