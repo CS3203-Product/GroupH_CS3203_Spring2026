@@ -91,24 +91,27 @@ class FocusModeTimer:
     # It breaks work into 25 minute "work" intervals with 5 minute breaks in between. 
     # After four "Pomodoros", the user takes a longer break of 15-30 minutes. Maybe we can let them set this one
 
-class FocusModeTimer:
-    def __init__(self, work_min=25, break_min=5):
+    def __init__(self, work_min=25, break_min=5, long_break_min=20):
         self.work_sec = work_min * 60
         self.break_sec = break_min * 60
+        self.long_break_sec = long_break_min * 60
+        
         self.time_left = self.work_sec
         self.is_running = False
-        self.mode = "Work" # Start in Work mode
+        self.mode = "Work"
+        self.completed_pomodoros = 0 # Track for long breaks
         
-        # Build the UI
-        with ui.card().classes('w-64 items-center'):
+        with ui.card().classes('w-64 items-center shadow-lg'):
             self.label = ui.label(self.mode).classes('text-h6')
             self.timer_display = ui.label(self.format_time()).classes('text-h3 font-mono')
             
             with ui.row():
-                self.start_btn = ui.button('Start', on_click=self.start)
-                ui.button('Reset', on_click=self.reset, color='red-5')
+                self.start_btn = ui.button('Start', on_click=self.start).props('elevated')
+                ui.button('Reset', on_click=self.reset, color='red-5').props('outline')
+            
+            # Counter display
+            self.stats = ui.label(f'Pomodoros: {self.completed_pomodoros}').classes('text-caption')
 
-        # This is the NiceGUI way to handle loops without freezing the UI
         self.tick_timer = ui.timer(1.0, self.tick, active=False)
 
     def format_time(self):
@@ -132,27 +135,32 @@ class FocusModeTimer:
         if self.time_left > 0:
             self.time_left -= 1
         else:
-            # Switch modes when timer hits zero
             if self.mode == "Work":
-                ui.notify("Time for a break!")
-                self.mode = "Break"
-                self.time_left = self.break_sec
+                self.completed_pomodoros += 1
+                if self.completed_pomodoros % 4 == 0:
+                    self.mode = "Long Break"
+                    self.time_left = self.long_break_sec
+                    ui.notify("Amazing! 4 sessions done. Take a long break!", type='positive')
+                else:
+                    self.mode = "Break"
+                    self.time_left = self.break_sec
+                    ui.notify("Time for a short break!")
             else:
-                ui.notify("Back to work!")
                 self.mode = "Work"
                 self.time_left = self.work_sec
+                ui.notify("Back to work!")
         
         self.update_ui()
 
     def update_ui(self):
         self.timer_display.text = self.format_time()
         self.label.text = self.mode
+        self.stats.text = f'Pomodoros: {self.completed_pomodoros}'
 
-    # Instantiate the UI
-    ui.label('Uncram Productivity Suite').classes('text-h4')
-    FocusModeTimer()
+# --- MAIN EXECUTION (Outdent these!) ---
+ui.label('Uncram!').classes('text-h4 q-ma-md')
+FocusModeTimer()
 
-    ui.run()
 
 class DistractionBlocker:
     # This class is responsible for blocking other websites from being accessed when task sessions begin.
