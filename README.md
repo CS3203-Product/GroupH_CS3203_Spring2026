@@ -3,6 +3,7 @@
 **Uncram**<br/>
 UnCram is a productivity program that helps users manage tasks through time blocking, conflict detection, and a prioritization engine that tracks deadlines and progress. An analytics dashboard monitors task completion, while a collaboration hub enables team communication, file sharing, and shared scheduling. To support focus, the program includes a timer, distraction-blocking web extension, and ambient sounds to keep users engaged during work sessions.
 
+<<<<<<< HEAD
 **Breakdown of UnCram:**
 + Language: Python
 + API(s) used: FastAPI,
@@ -59,5 +60,17 @@ To reach developers on the team about product inquires, discord usernames are li
 [onejosh]<br/>
 [crazinessjoy]<br/>
 	
+=======
+Feature goal:
+Create a visual calendar interface for dragging blocks for time to do tasks. Start with basic daily/weekly views; branch out to integrations with external calendars, e.g., Google or Outlook.
+
+What a fellow dev will need to use the project:
+import NiceGUI
+>>>>>>> bf73b9e (Update README.md)
 
 
+<<<<<<< HEAD
+=======
+Who maintains:
+Current group leader: Rayn
+>>>>>>> bf73b9e (Update README.md)
