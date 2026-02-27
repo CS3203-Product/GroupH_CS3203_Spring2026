@@ -16,65 +16,35 @@ class TaskPrioritizationEngine:
 class TimeBlockingScheduler:
     # This class is responsible for scheduling tasks into time blocks
     def __init__(self):
-        ui.label("Schedule - Basic view").style(
+        ui.label("Schedule - Basic Daily view").style(
             "font-family: 'Comic Sans MS'; font-size: 40px; color: black;"
         )
-
-        # calendar, can use later
-        ui.date(value='2026-01-01', on_change=lambda e: result.set_text(e.value))
-        result = ui.label()
         
 
-        with ui.grid(columns=7).classes('w-full gap-0'):
-            for day in ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']:
-                ui.label(day).classes('border p-1')
+        # --- TABLE DATA ---
+        self.columns = [
+            {'name': 'sun', 'label': 'Sunday', 'field': 'sun'},
+            {'name': 'mon', 'label': 'Monday', 'field': 'mon'},
+            {'name': 'tues', 'label': 'Tuesday', 'field': 'tues'},
+            {'name': 'wed', 'label': 'Wednesday', 'field': 'wed'},
+            {'name': 'thur', 'label': 'Thursday', 'field': 'thur'},
+            {'name': 'fri', 'label': 'Friday', 'field': 'fri'},
+            {'name': 'sat', 'label': 'Saturday', 'field': 'sat'},
+        ]
 
-        with ui.grid(columns=16).classes('w-full gap-0'):
-            ui.label('To-Do Today').classes('col-span-full border p-1').style('background-color: #e0f2fe')
-            ui.label('Work on features - 20 minutes').classes('col-span-8 border p-1').style('background-color: #E3D80B')
-            ui.label('Have a break - 15 minutes').classes('col-span-8 border p-1').style('background-color: #0BE314')
-            ui.label('Study for the midterm - 1 hour').classes('col-span-12 border p-1').style('background-color: #B00E0E')
-            ui.label('Side hustle - 10 minutes').classes('col-span-4 border p-1').style('background-color: #E3D80B')
-            ui.label('Make dinner - 45 minutes').classes('col-[span_15] border p-1').style('background-color: #E3D80B')
-            ui.label('Mid-day nap - 5 minutes').classes('col-span-1 border p-1').style('background-color: #0BE314')
-      
-        # table data
-        self.columns = [{'name': 'sun', 'label': 'Sunday', 'field': 'sun'},
-                        {'name': 'mon', 'label': 'Monday', 'field': 'mon'},
-                        {'name': 'tues', 'label': 'Tuesday', 'field': 'tues'},
-                        {'name': 'wed', 'label': 'Wednesday', 'field': 'wed'},
-                        {'name': 'thur', 'label': 'Thursday', 'field': 'thur'},
-                        {'name': 'fri', 'label': 'Friday', 'field': 'fri'},
-                        {'name': 'sat', 'label': 'Saturday', 'field': 'sat'}]
-        
-        self.rows = [{'sun': 'Hello'}]
+        self.rows = [
+            {'sun': 'Hello', 'mon': 'ay'},
+            {'mon': 'hi'},
+            {'fri': 'coolio'},
+        ]
 
-        # table
+        # --- TABLE ---
         self.table = ui.table(
             columns=self.columns,
             rows=self.rows,
         )
 
-        select1 = ui.select(['Sunday', 'Monday', 'Tuesday'], value='Sunday')
-
-        self.text = ui.input(label='New Task', placeholder='Start typing...')
-
-        def add_row():
-            typed = self.text.value
-            day = select1.value.lower()[:3]   # 'Sunday' → 'sun'
-            
-            new_row = {col['name']: '' for col in self.columns}
-            new_row[day] = typed
-
-            self.rows.append(new_row)
-            self.table.rows = self.rows
-            self.table.update()
-            ui.notify(f'Added: {typed}')
-
-        ui.button('Add Task', on_click=add_row)
-
 TimeBlockingScheduler()
-
 ui.run()
 
 class FocusModeTimer:
