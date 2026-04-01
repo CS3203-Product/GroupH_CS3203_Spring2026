@@ -5,11 +5,42 @@ class Task:
         self.name = name
         self.due_day = due_day
         self.importance = 0
+        self.shared_with = []
+        self.owner = None
+
+    #temporary for testing
+    def __str__(self):
+        return f"Task: {self.name}, Due: {self.due_day}, Importance: {self.importance}"
     pass
 
+#changed this for testing can be removed later
 class Uncram:
-    # This is the main class for the Uncram tool
-    pass
+    def __init__(self):
+        self.users = []
+        self.tasks = []
+        self.collaboration_hub = CollaborationHub()
+
+    def add_user(self, username):
+        if username not in self.users:
+            self.users.append(username)
+            return f"User '{username}' added."
+        return f"User '{username}' already exists."
+
+    def create_task(self, owner, name, due_day):
+        if owner not in self.users:
+            return "Owner must be a registered user."
+
+        task = Task(name, due_day)
+        task.owner = owner
+        self.tasks.append(task)
+        return task
+
+    def view_tasks_for_user(self, user):
+        visible_tasks = []
+        for task in self.tasks:
+            if self.collaboration_hub.can_view_task(user, task):
+                visible_tasks.append(task)
+        return visible_tasks
 
 class TaskPrioritizationEngine:
     # This class is responsible for prioritizing tasks based on various factors
@@ -98,8 +129,51 @@ class TaskAnalyticsDashboard:
     pass
 
 class CollaborationHub:
-    # This class is responsible for facilitating collaboration and communication among team members working on shared tasks
-    pass
+    def __init__(self):
+        self.invites = []
+
+    def send_invite(self, sender, receiver, task):
+        if task.owner != sender:
+            return "Only the owner can invite others."
+
+        if receiver in task.shared_with:
+            return f"{receiver} already has access to this task."
+
+        for invite in self.invites:
+            if(invite["sender"] == sender and invite["receiver"] == receiver and invite["task"] == task and invite["status"] == "pending"):
+                return f"Invite already pending for {receiver}."
+
+        invite = {"sender" : sender, "receiver": receiver, "task": task, "status" : "pending"}
+
+        self.invites.append(invite)
+        return f"Invite sent from {sender} to {receiver} for task '{task.name}'."
+
+    def view_invites(self, user):
+        user_invites = []
+        for invite in self.invites:
+            if invite["receiver"] == user and invite["status"] == "pending":
+                user_invites.append(invite)
+        return user_invites
+    
+    def accpet_invite(self, receiver, task):
+        for invite in self.invites:
+            if(invite["receiver"] == receiver and invite["task"] == task and invite["status"] == "pending"):
+                invite["status"] == "accepted"
+                task.shared_with.append(receiver)
+                return f"{receiver} accepted invite for task '{task.name}'."
+        return "no pending invite found."
+
+    def can_view_task(self, user, task):
+        return user == task.owner or user in task.shared_with
+    
+    def decline_invite(self, receiver, task):
+        for invite in self.invites:
+            if(invite["receiver"] == user and invite["status"] == "pending"):
+                invite["status"] = "declined"
+                return f"{receiver} declined invite for task '{task.name}'."
+        return "No pending invite found."
+
+    
 
 class AmbientFocusAid:
     # This class is responsible for providing ambient sounds and music to help users stay focused while working on tasks
