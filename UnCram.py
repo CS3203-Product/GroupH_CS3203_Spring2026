@@ -155,7 +155,7 @@ class CollaborationHub:
                 user_invites.append(invite)
         return user_invites
     
-    def accpet_invite(self, receiver, task):
+    def accept_invite(self, receiver, task):
         for invite in self.invites:
             if(invite["receiver"] == receiver and invite["task"] == task and invite["status"] == "pending"):
                 invite["status"] == "accepted"
@@ -168,7 +168,7 @@ class CollaborationHub:
     
     def decline_invite(self, receiver, task):
         for invite in self.invites:
-            if(invite["receiver"] == user and invite["status"] == "pending"):
+            if(invite["receiver"] == receiver and invite["task"] == task, invite["status"] == "pending"):
                 invite["status"] = "declined"
                 return f"{receiver} declined invite for task '{task.name}'."
         return "No pending invite found."
