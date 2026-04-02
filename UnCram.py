@@ -89,103 +89,85 @@ class FocusModeTimer:
     # This class is responsible for implementing a focus mode timer to help users stay focused on their tasks
     pass
 
+import unittest
+
+
 class DistractionBlocker:
-    # This class is responsible for blocking distracting websites and apps during focus mode
-    class DistractionBlocker:
-   # This class manages a list of distracting apps and websites
-    # Activates when the Pomodoro task completion session begins
-    # 
-
-    BLOCKED_SITES = [
-
-        "youtube.com",
-        "twitter.com",
-        "reddit.com",
-        "instagram.com",
-        "facebook.com",
-        "tiktok.com",
-        "twitch.tv",
-        "netflix.com",
-
-    ]
+    # This feature blocks websites that are distractions to users during scheduled task sessions (10:30AM - 20:00).  
+    # When the website is blocked, check_access returns true.
+    # When website is not blocked, check_access returns false. 
+    # Raise ValueError is for invalid/empty URLs.
 
     def __init__(self):
+        
+        self.blocked_sites = []
 
-        self.blocked_sites: list[str] = list(self.BLOCKED_SITES)
-        self.is_active = False
-        self.log_entries: list[str] = []
-        self._build_ui()
+    def set_blocked_sites(self, sites):
+        
+        self.blocked_sites = sites
 
-    # UI 
+    def check_access(self, url, current_time):
+        
+        if not url or not url.strip():
+            
+            raise ValueError("URL cannot be empty.")
 
-   def _build_ui(self):
+        # Time format: hours and minutes
+        hours, minutes = map(int, current_time.split(":"))
+        
+        total_minutes = hours * 60+ minutes
 
-    with ui.card().classes('blocker-card'):
+        # Task session (start and end time block): 10:30 (630 minutes) to 20:00 (1200 minutes)
 
-        self._build_header()
+        session_start = 10*60+ 30 
 
-        ui.separator().classes('q-my-sm')
+        session_end = 20 * 60          
 
-        self._build_blocklist_section()
+        in_session= session_start <= total_minutes<session_end
 
-        ui.separator().classes('q-my-sm')
+        if in_session and url in self.blocked_sites:
 
-        self._build_log_section()
+            return True  # for when site is blocked
 
-def _build_header(self):
-
-    with ui.row().classes('blocker-header'):
-
-        ui.icon('shield', size = 'sm').classes('shield-icon')
-
-        ui.label('Distraction Blocker').classes('blocker-title')
-
-        self.status_chip = ui.chip(
-            'INACTIVE', icon = 'lock_open'
-        ).classes('status-chip inactive')
-
-def _build_blocklist_section(self):
-
-    with ui.column().classes('full-width gap-xs'):
-
-        ui.label('Blocked Sites').classes('section-label')
-
-        self.site_list_container = ui.column().classes('site-list')
-
-        self._render_site_list()
-
-        self._build_add_site_row()
-
-def _build_add_site_row(self):
-
-    with ui.row().classes('full-width items-center gap-xs add-row'):
-
-        self.new_site_input = ui.input(
-            placeholder = 'add a site (i.e. yahoo.com)'
-        ).classes('site-input').props('dense outlined')
-        ui.button(
-            icon='add', on_click=self._add_site
-        ).props('flat dense').classes('add-btn')
-
-def _build_log_section(self):
-
-    with ui.column().classes('full-width space-xs'):
-
-        ui.label('Session Log').classes('section-label')
-
-        self.log_container = ui.column().classes('log-box')
-
-        self._render_log()
-
-            # Manager for blocklist
-            with ui.column().classes('full-width gap-xs'):
-                ui.label('Blocked Sites').classes('section-label')
-
-                self.site_list_container = ui.column().classes('site-list')
-                self._render_site_list()
+        return False  #for when site is unblocked , accessible
 
 
+class TestDistractionBlocker(unittest.TestCase):
 
+    def setUp(self):
+
+        self.blocker = DistractionBlocker()
+
+        self.blocked=  ["facebook.com"]
+
+        self.blocker.set_blocked_sites(self.blocked)  
+
+    def test_block_valid_site_during_task_session(self):
+
+        # At 20:00, the session ends and access to other sites is opened
+
+        result = self.blocker.check_access("facebook.com", current_time="20:00")
+        
+        self.assertFalse(result, "Access to sites open after 20:00")
+
+    def test_boundary_start_time(self):
+
+        # At 10:30, the session starts and access to other sites should be blocked
+
+        result =self.blocker.check_access("facebook.com", current_time="10:30")
+        
+        self.assertTrue(result, "Blocker activates at 10:30 AM")
+
+    def test_invalid_url_format(self):
+
+        with self.assertRaises(ValueError):
+            
+            self.blocker.check_access("", current_time="10:30")
+
+
+if __name__ == "__main__":
+    
+    unittest.main()
 
 class TaskAnalyticsDashboard:
     # This class is responsible for providing analytics and insights on task completion and productivity
