@@ -12,6 +12,15 @@ At this time, an installation for the program is currently unavailable as it is 
 **Current Status**<br/>
 The program is currently in early stages of development. Changes and updates on progression of our development will be stated explicitly here.
 
+**Running tests**<br/>
+From the repository root, use Python’s built-in `unittest` discovery (no extra packages required):
+
+```
+python -m unittest discover -t . -s tests -p 'test_*.py' -v
+```
+
+The `-t .` flag sets the project root on the import path so tests can import `UnCram`. Omit `-v` for less verbose output.
+
 **Usage**<br/>
 Access and availability to the program is unavailable as the development is in its early stages. However, upon development completion, the program will be accessible on a public domain through the web included with all features.
 
