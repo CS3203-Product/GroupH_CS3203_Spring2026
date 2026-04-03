@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import unittest
 from unittest.mock import MagicMock
 from UnCram import FocusModeTimer
@@ -73,6 +72,3 @@ class TestFocusModeTimer(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-=======
-
->>>>>>> 6e92cd4 (Create unit test)
