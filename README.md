@@ -38,4 +38,5 @@ In this website you can focus on just setting up VSCode.
 
 **How To Run the Test**<br/>
 1.) Clone the repository into a folder to be able to download the code to test.<br/>
-2.) Run the test_TaskPriority.py file in VSCode by using git bash terminal and putting in "pytest -v". You will notice only the update_day_selection will pass the test<br/>
+2.) Run git clone -b Test_TaskPriority https://github.com/CS3203-Product/GroupH_CS3203_Spring2026.git to access this test case
+3.) Run the test_TaskPriority.py file in VSCode by using git bash terminal and putting in "pytest -v". You will notice only the update_day_selection will pass the test<br/>
