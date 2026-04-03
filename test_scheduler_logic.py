@@ -11,7 +11,7 @@ def test_add_single_task():
     assert scheduler.rows[5]["mon"] == "Study"
 
 
-def test_add_multiple_tasks_same_slot():
+def test_add_multiple_tasks_same_day_and_importance():
     scheduler = SchedulerLogic()
 
     scheduler.add_task(Task("Math", "tues", 10))
@@ -20,7 +20,7 @@ def test_add_multiple_tasks_same_slot():
     assert scheduler.rows[10]["tues"] == "Math, Physics"
 
 
-def test_tasks_go_to_correct_rows():
+def test_tasks_go_to_correct_importance_row():
     scheduler = SchedulerLogic()
 
     scheduler.add_task(Task("Chemistry", "fri", 3))
@@ -30,22 +30,23 @@ def test_tasks_go_to_correct_rows():
     assert scheduler.rows[4]["fri"] == "Biology"
 
 
-def test_populate_clears_then_refills():
+def test_populate_clears_previous_values():
     scheduler = SchedulerLogic()
 
     scheduler.add_task(Task("History", "sun", 2))
     scheduler.add_task(Task("English", "sun", 2))
 
-    # Should contain both tasks
+    # Before clearing, row should have both tasks
     assert scheduler.rows[2]["sun"] == "History, English"
 
-    # Repopulate to ensure clearing logic works
+    # Manually clear and repopulate
     scheduler.populate_calendar()
 
+    # Should still have the same tasks after repopulating
     assert scheduler.rows[2]["sun"] == "History, English"
 
 
-def test_empty_scheduler_starts_empty():
+def test_empty_scheduler_has_empty_rows():
     scheduler = SchedulerLogic()
 
     for row in scheduler.rows:
