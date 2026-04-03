@@ -6,13 +6,17 @@ class Task:
     pass
 from nicegui import ui
 
+class Task:               
+    def __init__(self, name, due_day):
+        self.name = name
+        self.due_day = due_day
+        self.importance = 0
+    pass
+
 class Uncram:
     # This is the main class for the Uncram tool
     pass
 
-class TaskPrioritizationEngine:
-    # This class is responsible for prioritizing tasks based on various factors
-    pass
 class TimeBlockingScheduler:
     # This class is responsible for scheduling tasks into time blocks
     def __init__(self):
@@ -22,47 +26,37 @@ class TimeBlockingScheduler:
         
 
         # --- TABLE DATA ---
-        self.columns = [
-            {'name': 'sun', 'label': 'Sunday', 'field': 'sun'},
-            {'name': 'mon', 'label': 'Monday', 'field': 'mon'},
-            {'name': 'tues', 'label': 'Tuesday', 'field': 'tues'},
-            {'name': 'wed', 'label': 'Wednesday', 'field': 'wed'},
-            {'name': 'thur', 'label': 'Thursday', 'field': 'thur'},
-            {'name': 'fri', 'label': 'Friday', 'field': 'fri'},
-            {'name': 'sat', 'label': 'Saturday', 'field': 'sat'},
-        ]
+        self.columns = [ {'name': 'importance', 'label': 'Importance', 'field': 'importance'},
+        {'name': 'sun', 'label': 'Sunday', 'field': 'sun'},
+        {'name': 'mon', 'label': 'Monday', 'field': 'mon'},
+        {'name': 'tues', 'label': 'Tuesday', 'field': 'tues'},
+        {'name': 'wed', 'label': 'Wednesday', 'field': 'wed'},
+        {'name': 'thur', 'label': 'Thursday', 'field': 'thur'},
+        {'name': 'fri', 'label': 'Friday', 'field': 'fri'},
+        {'name': 'sat', 'label': 'Saturday', 'field': 'sat'}, ]
+
+        importance = [f"{h}" for h in range(0, 21)] 
 
         self.rows = [
-            {'sun': 'Hello', 'mon': 'ay'},
-            {'mon': 'hi'},
-            {'fri': 'coolio'},
-        ]
+            {'importance': t, 'sun': '', 'mon': '', 'tues': '', 'wed': '', 'thur': '', 'fri': '', 'sat': ''}
+            for t in importance ]
+                
+        self.tasks = [                      # Example tasks; they should come from Task Prioritization Engine
+            Task("Math Homework", "mon"),
+            Task("Science Project", "wed"),
+            Task("Grocery Shopping", "sat"),
+            Task("Read Chapter 5", "tues"), ]
 
-        # --- TABLE ---
-        self.table = ui.table(
-            columns=self.columns,
-            rows=self.rows,
-        )
+        self.populate_calendar()
+
+        ui.table(columns=self.columns, rows=self.rows)
+
+    def populate_calendar(self):
+        for task in self.tasks:
+            for row in self.rows:
+                if row[task.due_day] == "":
+                    row[task.due_day] = task.name
+                    break
 
 TimeBlockingScheduler()
 ui.run()
-
-class FocusModeTimer:
-    # This class is responsible for implementing a focus mode timer to help users stay focused on their tasks
-    pass
-
-class DistractionBlocker:
-    # This class is responsible for blocking distracting websites and apps during focus mode
-    pass
-
-class TaskAnalyticsDashboard:
-    # This class is responsible for providing analytics and insights on task completion and productivity
-    pass
-
-class CollaborationHub:
-    # This class is responsible for facilitating collaboration and communication among team members working on shared tasks
-    pass
-
-class AmbientFocusAid:
-    # This class is responsible for providing ambient sounds and music to help users stay focused while working on tasks
-    pass
