@@ -1,3 +1,4 @@
+ HEAD
 # CS3203-Productivity-App
 
 **Uncram**<br/>
@@ -58,3 +59,6 @@ To reach developers on the team about product inquires, discord usernames are li
 [nguyetng]<br/>
 [onejosh]<br/>
 [crazinessjoy]<br/>
+=======
+test
+>>>>>>> 0d0ffcf (Update README.md)
