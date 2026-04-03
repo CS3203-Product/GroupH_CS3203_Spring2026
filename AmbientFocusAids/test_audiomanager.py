@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
-from audio_manager import AudioManager
+from audiomanager import AudioManager
 
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
