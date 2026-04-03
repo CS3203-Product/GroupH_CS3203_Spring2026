@@ -38,17 +38,4 @@ In this website you can focus on just setting up VSCode.
 
 **How To Run the Test**<br/>
 1.) Clone the repository into a folder to be able to download the code to test.<br/>
-2.) Run the test_TaskPriority.py file in VSCode<br/>
-Once the test is ran we shall see that for each test case there will be a corresponding true or false: <br/>
-Test Case 1: Task Creation<br/>
-This first test is seeing if a task can be created at all and that it was stored. Should see True as the output<br/>
-
-Test Case 2: Prevent Empty Task<br/>
-This test is seeing if you can create a blank task by entering just empty space. Should see true
-
-Test Case 3: Due Date Change
-This is to test that the function will allow you to update the due date of a task
-
-Test Case 4: Testing Creation of Multiple Tasks
-Checking that the function will create multiple different task and have them appropriately named. As well as stored in a list to be able to be called on later.
-
+2.) Run the test_TaskPriority.py file in VSCode by using git bash terminal and putting in "pytest -v". You will notice only the update_day_selection will pass the test<br/>
