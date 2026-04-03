@@ -21,12 +21,13 @@ Install miniconda (https://www.anaconda.com/docs/getting-started/miniconda/insta
 Miniconda is a lightweight tool that allows you to make virtual environments, as well as gives you access to a few essential python packages.<br/>
 Run conda create -n [your env name] python=3.11 in your terminal/Anaconda Prompt<br/>
 Activate the environment with conda activate [your env name]<br/>
-*Now that you’re in the environment, any dependencies you install with only be accessible within your virtual environment.
+*Now that you’re in the environment, any dependencies you install with only be accessible within your virtual environment. <br/>
+You will need to run the code: pip install nicegui pytest <br/>
 
 Example: (In this Test Case we will set [Your_Environment_Name] to TestTaskPriority<br/>
 (base) C:Users/username> conda create -n [Your_Environment_Name] python=3.11<br/>
 (base) C:Users/username> conda activate [Your_Environment_Name]<br/>
-(Your_Environment_Name) C:Users/username><br/>
+(Your_Environment_Name) C:Users/username>pip install nicegui pytest<br/>
 
 Now that you have a virtual environment set up, make sure you activate it before installing any dependencies or running your project. If you ever forget the name of you environment, run conda env list to get a full list of the environments you’ve created.
 
