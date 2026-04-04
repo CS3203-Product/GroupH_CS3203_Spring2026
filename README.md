@@ -20,6 +20,12 @@ Will need to have Python installed (at least version 3.11)
 Then, you will need to run the code: pip install nicegui
 
 How To Run the Test
-1) Clone the repository into a folder to be able to download the code to test.
-2) git checkout FocusModeTimer
-3) Run the test_FocusModeTimer.py file in VSCode by using git bash terminal and putting in "python -m unittest test_FocusModeTimer.py". You will notice that all 6 tests pass.
+1. For a smooth experience, you can download GitHub Desktop instead of using the terminal to clone the repository. https://desktop.github.com/download/
+2. After downloading, in the top left of GitHub Desktop, you can clone the repository into a folder to be able to download the code to test. Then it will appear as the main branch, switch to the FocusModeTimer branch.
+3. Install Python https://www.python.org/downloads/. When the installer opens, you MUST check the box at the bottom that says:
+☑ Add Python.exe to PATH
+(If you miss this, pip won't work later!) Then, in the VS Code extension, install Python again to trigger the PATH.
+4. In the center of the GitHub Desktop, you will see "Open the repo in your external editor." Choose "Open in VS Code."
+5. GIT BASH type "python -m pip install nicegui." Then, "python -m unittest test_FocusModeTimer.py"
+
+
