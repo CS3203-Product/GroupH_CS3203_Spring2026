@@ -2,13 +2,13 @@
 GroupH_Ticket5PSprint1CodeReview_CS3203Spring2026
 
 Uncram
-Uncram is a productivity program that helps users manage tasks through time blocking, conflict detection, and a prioritization engine that tracks deadlines and progress. An analytics dashboard monitors task completion, while a collaboration hub enables team communication, file sharing, and shared scheduling. To support focus, the program includes a timer, distraction-blocking web extension, and ambient sounds to keep users engaged during work sessions.
+Uncram is a productivity program that helps users manage tasks through time blocking, conflict detection, and a prioritization engine that tracks deadlines and progress. An analytics dashboard monitors task completion, while a collaboration hub enables team communication, file sharing, and shared scheduling. To support focus, the program includes a timer, a distraction-blocking web extension, and ambient sounds to keep users engaged during work sessions.
 
 Within UnCram, we have the function of FocusModeTimer. This function is responsible for representing a focus mode timer to help users stay focused on their tasks
-    # We are creating a Pomodoro-style timer
-    # It breaks work into 25-minute "work" intervals with 5-minute breaks in between. 
-    # As for the unit test, we set the timer for work to 1 minute.
-    # After four "Pomodoros", the user takes a longer break of 15-30 minutes.
+    - We are creating a Pomodoro-style timer
+    - It breaks work into 25-minute "work" intervals with 5-minute breaks in between. 
+    - As for the unit test, we set the timer for work to 1 minute.
+    - After four "Pomodoros", the user takes a longer break of 15-30 minutes.
 
 This README will undergo several changes over the course of our product development. Anything that is currently a placeholder will be changed according to our progression.
 
