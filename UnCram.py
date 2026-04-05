@@ -18,7 +18,7 @@ class FocusModeTimer:
     # After four "Pomodoros", the user takes a longer break of 15-30 minutes. Maybe we can let them set this one
 
 
-    def __init__(self, work_min=1, break_min=5, long_break_min=20):
+    def __init__(self, work_min=25, break_min=5, long_break_min=20):
         self.work_sec = work_min * 60
         self.break_sec = break_min * 60
         self.long_break_sec = long_break_min * 60
@@ -37,7 +37,6 @@ class FocusModeTimer:
             with ui.row():
                 self.start_btn = ui.button('Start', on_click=self.start).props('elevated')
                 ui.button('Reset', on_click=self.reset, color='red-5').props('outline')
-                ui.button('Start Break', on_click=self.start_break_session, color='orange').props('round')
             
             # Counter display
             self.stats = ui.label(f'Pomodoros: {self.completed_pomodoros}').classes('text-caption')
