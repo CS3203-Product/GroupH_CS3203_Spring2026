@@ -1,11 +1,3 @@
-<<<<<<< HEAD:UnCram.py
-class Task:               
-    def __init__(self, name, due_day):
-        self.name = name
-        self.due_day = due_day
-        self.importance = 0
-    pass
-from nicegui import ui
 # scheduler_logic.py
 
 class Task:               
@@ -39,7 +31,6 @@ class SchedulerLogic:
             if target_row[task.due_day]:
                 target_row[task.due_day] += f", {task.name}"
             else:
-=======
 # scheduler_logic.py
 
 class Task:               
@@ -73,5 +64,4 @@ class SchedulerLogic:
             if target_row[task.due_day]:
                 target_row[task.due_day] += f", {task.name}"
             else:
->>>>>>> 3eedf30 (Fix tests - Brittney Situ):scheduler_logic.py
                 target_row[task.due_day] = task.name
