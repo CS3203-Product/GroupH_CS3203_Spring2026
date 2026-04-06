@@ -58,6 +58,3 @@ To reach developers on the team about product inquires, discord usernames are li
 [nguyetng]<br/>
 [onejosh]<br/>
 [crazinessjoy]<br/>
-	
-
-
