@@ -91,7 +91,6 @@ class FocusModeTimer:
     # It breaks work into 25 minute "work" intervals with 5 minute breaks in between. 
     # After four "Pomodoros", the user takes a longer break of 15-30 minutes. Maybe we can let them set this one
 
-
     def __init__(self, work_min=25, break_min=5, long_break_min=20):
         self.work_sec = work_min * 60
         self.break_sec = break_min * 60
@@ -179,8 +178,7 @@ class FocusModeTimer:
         else:
             self.timer_display.classes('text-orange-500', remove='text-blue-500')
 
-  
-# --- MAIN EXECUTION (Outdent these!) ---
+
 with ui.column().classes('absolute-center items-center'):
     ui.label('Uncram!').classes('text-h2 q-mb-md font-bold') # Made it bigger/bolder
     FocusModeTimer()
