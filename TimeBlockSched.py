@@ -1,5 +1,5 @@
 from nicegui import ui
-import UnCram
+from UnCram import Task
 
 class TimeBlockingScheduler:
     # This class is responsible for scheduling tasks into time blocks
