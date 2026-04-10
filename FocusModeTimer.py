@@ -7,7 +7,7 @@ class FocusModeTimer:
     # After four "Pomodoros", the user takes a longer break of 15-30 minutes. Maybe we can let them set this one
 
     def __init__(self, work_min=1, break_min=5, long_break_min=20):
-        self.work_sec = work_min * 60
+        self.work_sec = work_min * 10 # For testing, we can set this to 1 minute (60 seconds) instead of 25 minutes (1500 seconds)
         self.break_sec = break_min * 60
         self.long_break_sec = long_break_min * 60
         
