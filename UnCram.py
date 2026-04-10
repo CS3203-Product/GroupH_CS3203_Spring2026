@@ -1,24 +1,5 @@
 from datetime import datetime
-
-
-class Uncram:
-    # This is the main class for the Uncram tool
-    pass
-
-class TaskPrioritizationEngine:
-    # This class is responsible for prioritizing tasks based on various factors
-    pass
-class TimeBlockingScheduler:
-    # This class is responsible for scheduling tasks into time blocks
-    pass
-
-class FocusModeTimer:
-    # This class is responsible for implementing a focus mode timer to help users stay focused on their tasks
-    pass
-
-class DistractionBlocker:
-    # This class is responsible for blocking distracting websites and apps during focus mode
-    pass
+from nicegui import ui
 
 class TaskRecord:
     """Represents a single completed or in-progress task with timing metadata."""
@@ -112,10 +93,9 @@ class TaskAnalyticsDashboard:
     def total_time_spent(self) -> float:
         return sum(r.time_spent_minutes for r in self._records.values())
 
-class CollaborationHub:
-    # This class is responsible for facilitating collaboration and communication among team members working on shared tasks
-    pass
-
-class AmbientFocusAid:
-    # This class is responsible for providing ambient sounds and music to help users stay focused while working on tasks
+class Task:               
+    def __init__(self, name, due_day):
+        self.name = name
+        self.due_day = due_day
+        self.importance = 0
     pass
