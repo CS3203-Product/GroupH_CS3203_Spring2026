@@ -1,5 +1,5 @@
 from nicegui import ui
 
 class Login:
-    
-    pass
+    ui.label('login here')
+    ui.run()
