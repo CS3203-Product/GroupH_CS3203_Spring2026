@@ -27,7 +27,6 @@ class TestPresets:
     def test_list_presets_invalid_category_returns_empty(self, manager):
         result = manager.list_presets(category="nonexistent")
         assert result == {}
-
     def test_play_valid_preset(self, manager):
         manager.play_preset("rain")
         assert manager.active_track is not None
