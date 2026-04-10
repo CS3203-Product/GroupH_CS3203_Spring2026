@@ -1,6 +1,7 @@
 from nicegui import ui
 
 class Login:
+<<<<<<< HEAD
 
     credentials = {
         "alice": "123",
@@ -30,3 +31,7 @@ class Login:
 
 Login()
 ui.run()
+=======
+    
+    pass
+>>>>>>> 662b757 (Initial commit -Brittney 4/10/2026 12:45 pm)
