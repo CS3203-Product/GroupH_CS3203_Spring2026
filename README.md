@@ -40,11 +40,12 @@ tests/                 # pytest (scheduler, collaboration, analytics, audio, blo
 ### 1 · Prerequisites
 
 - Python **3.10+**: https://www.python.org/downloads/
+- Visual Studio Code: https://code.visualstudio.com/download
 - **Docker** (for PostgreSQL): https://www.docker.com/get-started/
 
 ### 2 · Clone & virtualenv
 
-```bash
+```bash or powershell
 git clone https://github.com/CS3203-Product/GroupH_CS3203_Spring2026.git
 cd CS3203-Productivity-App
 python3 -m venv .venv
@@ -58,28 +59,29 @@ pip install -r requirements.txt
 
 ### 3 · Environment
 
-```bash
+```bash or powershell
 Mac: cp .env.template .env
 Windows: Copy-Item .env.template .env
 # Edit .env if needed (defaults match docker-compose)
 ```
 
 ### 4 · Database
-
-```bash
+Open Docker, and sign in (or create an account)
+```bash or powershell
 docker compose up -d
 ```
-
+Open CS3203-Productivity-App in Visual Studio Code, then open docker-compose.yml and .env
 Ensure `DATABASE_URL` in `.env` matches the **host port** mapped in `docker-compose.yml` (e.g. `localhost:55432` if you use that mapping).
 
 ### 5 · Run the app
 
-```bash
-source .venv/bin/activate
+```bash or powershell
+Mac: source .venv/bin/activate
+Windows: .venv\Scripts\Activate.ps1
 python app.py
 ```
 
-Then open:
+App should open automnatically, if not then open:
 
 - 🖥️ **App:** [http://localhost:8000](http://localhost:8000)
 - 📘 **Swagger:** [http://localhost:8000/docs](http://localhost:8000/docs)
@@ -97,7 +99,7 @@ pytest tests/ -v
 
 Or unittest-style for a single module:
 
-```bash
+```bash or powershell
 python -m unittest tests.test_collaboration -v
 ```
 
