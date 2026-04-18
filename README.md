@@ -50,7 +50,7 @@ cd CS3203-Productivity-App
 python3 -m venv .venv
 Mac: source .venv/bin/activate
 Windows: .venv\Scripts\activate
-  (If "running on scripts is disabled" appears, run Powershell as an administrator and then run Set-ExecutionPolicy -Scope CurrentUser RemoteSigned, then press A)
+  (If "running on scripts is disabled" appears, run Powershell as an administrator, run Set-ExecutionPolicy -Scope CurrentUser RemoteSigned, type A and hit enter)
 pip install -r requirements.txt
 ```
 
