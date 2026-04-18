@@ -45,7 +45,7 @@ tests/                 # pytest (scheduler, collaboration, analytics, audio, blo
 ### 2 · Clone & virtualenv
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/CS3203-Product/GroupH_CS3203_Spring2026.git
 cd CS3203-Productivity-App
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
