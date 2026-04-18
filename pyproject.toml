@@ -1,0 +1,10 @@
+[project]
+name = "cs3203-productivity-app"
+version = "0.1.0"
+description = "UnCram productivity app (NiceGUI + FastAPI)"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -2,7 +2,7 @@
 
 import unittest
 
-from UnCram import TaskAnalyticsDashboard
+from src.productivity.task_analytics_dashboard import TaskAnalyticsDashboard
 
 
 class TestTaskAnalyticsDashboard(unittest.TestCase):
