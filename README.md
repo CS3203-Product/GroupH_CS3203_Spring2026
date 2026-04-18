@@ -39,8 +39,8 @@ tests/                 # pytest (scheduler, collaboration, analytics, audio, blo
 
 ### 1 · Prerequisites
 
-- Python **3.10+**
-- **Docker** (for PostgreSQL)
+- Python **3.10+**: https://www.python.org/downloads/
+- **Docker** (for PostgreSQL): https://www.docker.com/get-started/
 
 ### 2 · Clone & virtualenv
 
