@@ -50,13 +50,15 @@ cd CS3203-Productivity-App
 python3 -m venv .venv
 Mac: source .venv/bin/activate
 Windows: .venv\Scripts\activate
+  (If "running on scripts is disabled" appears, run Powershell as an administrator and then run Set-ExecutionPolicy -Scope CurrentUser RemoteSigned, then press A)
 pip install -r requirements.txt
 ```
 
 ### 3 · Environment
 
 ```bash
-cp .env.template .env
+Mac: cp .env.template .env
+Windows: Copy-Item .env.template .env
 # Edit .env if needed (defaults match docker-compose)
 ```
 
