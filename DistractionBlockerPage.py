@@ -7,7 +7,7 @@ USER_ID = "123"
 async def add_site(site_input, refresh_fn):
     url = site_input.value.strip()
     if not url:
-        ui.notify('Please enter a site URL', type='warning')
+        ui.notify('Enter URL here', type='warning')
         return
     async with httpx.AsyncClient() as client:
         await client.post(f'{BASE_URL}/blocker/sites/{USER_ID}', params={'url': url})
@@ -25,8 +25,8 @@ async def remove_site(url, refresh_fn):
 async def main():
     ui.label('Distraction Blocker')
     with ui.card().classes('w-96'):
-        site_input = ui.input(placeholder='e.g. facebook.com').classes('w-full')
-        ui.button('Block Site', on_click=lambda: add_site(site_input, refresh_list)).props('elevated')
+        site_input = ui.input(placeholder='e.g. what.com').classes('w-full')
+        ui.button('Block Site', on_click=lambda: add_site(site_input, refresh_list))
     ui.separator().classes('q-my-md')
     ui.label('BLOCKED SITES LISTED BELOW')
     site_list = ui.column()
