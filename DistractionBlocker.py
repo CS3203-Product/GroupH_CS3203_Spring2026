@@ -23,9 +23,9 @@ class DistractionBlocker:
         total_minutes = hours * 60 + minutes
 
         # Task session (start and end time block): 10:30 (630 minutes) to 20:00 (1200 minutes)
-        session_start = 10 *60 + 30
+        session_start = 0
 
-        session_end = 20 * 60
+        session_end = 24 * 60
 
         in_session = session_start <= total_minutes < session_end
        
