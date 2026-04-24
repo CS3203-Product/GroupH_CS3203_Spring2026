@@ -23,6 +23,7 @@ from src.frontend.pages import (
     login as login_page,
     priorities,
     schedule,
+    signup,
 )
 
 
