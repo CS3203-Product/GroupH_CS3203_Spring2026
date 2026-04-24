@@ -72,12 +72,12 @@ def _build_category_chart(analytics: TaskAnalyticsDashboard) -> None:
     ui.echart(
         {
             "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
-            "legend": {"textStyle": {"color": "#94a3b8"}},
-            "grid": {"left": "3%", "right": "4%", "bottom": "10%", "containLabel": True},
+            "legend": {"top": "0%", "textStyle": {"color": "#94a3b8"}},
+            "grid": {"left": "3%", "right": "4%", "top": "15%", "bottom": "3%", "containLabel": True},
             "xAxis": {
                 "type": "category",
                 "data": categories,
-                "axisLabel": {"color": "#94a3b8"},
+                "axisLabel": {"color": "#94a3b8", "interval": 0},
             },
             "yAxis": {"type": "value", "axisLabel": {"color": "#94a3b8"}},
             "series": [
