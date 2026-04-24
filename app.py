@@ -17,6 +17,7 @@ from src.frontend.pages import (
     ambient,
     collaboration,
     create_user,
+    dashboard,
     focus,
     home,
     items as items_page,

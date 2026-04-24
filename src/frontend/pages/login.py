@@ -13,7 +13,7 @@ from src.repositories.user import user_repo
 def login_page():
     """Sign in to UnCram."""
     if state.get_auth():
-        ui.navigate.to("/items")
+        ui.navigate.to("/dashboard")
         return
 
     with ui.column().classes(
@@ -78,7 +78,7 @@ async def perform_login(email_input: ui.input, password_input: ui.input):
             }
             state.set_auth(auth_data)
             app.storage.user["is_superuser"] = user.is_superuser
-            ui.navigate.to("/items")
+            ui.navigate.to("/dashboard")
     except HTTPException as e:
         notifications.show_error(e.detail)
     except Exception as e:
