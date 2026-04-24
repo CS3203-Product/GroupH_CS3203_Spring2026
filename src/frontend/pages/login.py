@@ -63,6 +63,14 @@ def login_page():
 
             enable_button_on_user_inputs([email, password], login_button)
 
+        with ui.row().classes("justify-center"):
+            ui.label("Don't have an account?").classes(
+                "text-slate-600 dark:text-slate-400"
+            )
+            ui.link("Sign up", "/signup").classes(
+                "text-emerald-600 dark:text-emerald-400 font-medium"
+            )
+
 
 async def perform_login(email_input: ui.input, password_input: ui.input):
     if not email_input.validate() or not password_input.validate():
