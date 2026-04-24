@@ -17,6 +17,10 @@ _BRAND_CSS = """
     --q-info: #0284c7;
     --q-warning: #d97706;
   }
+  /* Quasar sets `.q-drawer { background: #fff }`, which overrides Tailwind on the same node. */
+  body.body--dark q-drawer.nicegui-drawer {
+    background-color: rgb(15 23 42) !important;
+  }
 </style>
 """
 

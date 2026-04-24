@@ -6,6 +6,10 @@ from src.db.session import get_db_context
 from src.frontend import state
 from src.frontend.components import notifications
 from src.frontend.components.form_utils import enable_button_on_user_inputs
+from src.frontend.components.theme_toggle import (
+    create_theme_toggle_button,
+    setup_user_dark_mode,
+)
 from src.repositories.user import user_repo
 
 
@@ -15,6 +19,10 @@ def login_page():
     if state.get_auth():
         ui.navigate.to("/items")
         return
+
+    dark_mode = setup_user_dark_mode()
+    with ui.row().classes("fixed top-3 right-3 z-10"):
+        create_theme_toggle_button(dark_mode, for_header=False)
 
     with ui.column().classes(
         "absolute-center w-full max-w-md items-stretch gap-6 px-4"
