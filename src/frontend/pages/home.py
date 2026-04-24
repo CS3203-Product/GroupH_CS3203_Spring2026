@@ -12,4 +12,4 @@ async def home_page():
     if not state.get_auth():
         ui.navigate.to("/login")
     else:
-        ui.navigate.to("/items")
+        ui.navigate.to("/dashboard")

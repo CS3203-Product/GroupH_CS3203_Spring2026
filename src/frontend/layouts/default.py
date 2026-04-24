@@ -8,7 +8,8 @@ from src.frontend.components.header import create_header
 from src.frontend.state import clear_auth
 
 _NAV = [
-    ("dashboard", "/items", "Task board"),
+    ("dashboard", "/dashboard", "Dashboard"),
+    ("assignment", "/items", "Task board"),
     ("calendar_month", "/schedule", "Schedule"),
     ("timer", "/focus", "Focus timer"),
     ("graphic_eq", "/ambient", "Ambient"),
