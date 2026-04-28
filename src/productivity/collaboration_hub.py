@@ -1,44 +1,54 @@
 """Collaboration invites and shared task access (logic only, no UI)."""
 
-from src.productivity.collaboration_models import CollaborationTask
+from src.productivity.collaboration_models import CollaborationTask, CollaborationInvite
+from sqlmodel import Session, select
+from src.db.session import get_db_context
 
 
 class CollaborationHub:
     def __init__(self):
         self.invites: list[dict] = []
 
-    def send_invite(self, sender: str, receiver: str, task: CollaborationTask) -> str:
+    def send_invite(self, db: Session, sender: str, receiver: str, task: CollaborationTask) -> str:
         if task.owner != sender:
             return "Only the owner can invite others."
 
         if receiver in task.shared_with:
             return f"{receiver} already has access to this task."
 
-        for invite in self.invites:
-            if (
-                invite["sender"] == sender
-                and invite["receiver"] == receiver
-                and invite["task"] == task
-                and invite["status"] == "pending"
-            ):
-                return f"Invite already pending for {receiver}."
+        task_id = 1  # temporary for testing
 
-        invite = {
-            "sender": sender,
-            "receiver": receiver,
-            "task": task,
-            "status": "pending",
-        }
+        existing_invite = db.exec(
+            select(CollaborationInvite).where(
+                CollaborationInvite.sender == sender,
+                CollaborationInvite.receiver == receiver,
+                CollaborationInvite.task_id == task_id,
+                CollaborationInvite.status == "pending",
+            )
+        ).first()
 
-        self.invites.append(invite)
+        if existing_invite:
+            return f"Invite already pending for {receiver}."
+
+        invite = CollaborationInvite(
+            sender=sender,
+            receiver=receiver,
+            task_id=task_id,
+            status="pending",
+        )
+
+        db.add(invite)
+        db.commit()
+
         return f"Invite sent from {sender} to {receiver} for task '{task.name}'."
 
-    def view_invites(self, user: str) -> list[dict]:
-        user_invites = []
-        for invite in self.invites:
-            if invite["receiver"] == user and invite["status"] == "pending":
-                user_invites.append(invite)
-        return user_invites
+    def view_invites(self, db: Session, user: str):
+        statement = select(CollaborationInvite).where(
+            CollaborationInvite.receiver == user,
+            CollaborationInvite.status == "pending"
+        )
+        results = db.exec(statement).all()
+        return results
 
     def accept_invite(self, receiver: str, task: CollaborationTask) -> str:
         for invite in self.invites:
