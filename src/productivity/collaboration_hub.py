@@ -3,6 +3,7 @@
 from src.productivity.collaboration_models import CollaborationTask, CollaborationInvite
 from sqlmodel import Session, select
 from src.db.session import get_db_context
+from src.models.models import Task
 
 
 class CollaborationHub:
@@ -16,7 +17,14 @@ class CollaborationHub:
         if receiver in task.shared_with:
             return f"{receiver} already has access to this task."
 
-        task_id = 1  # temporary for testing
+        task_row = db.exec(
+            select(Task).where(Task.name == task.name)
+        ).first()
+
+        if not task_row:
+            return "Task not found."
+
+        task_id = task_row.id
 
         existing_invite = db.exec(
             select(CollaborationInvite).where(
@@ -39,6 +47,7 @@ class CollaborationHub:
 
         db.add(invite)
         db.commit()
+        db.refresh(invite)
 
         return f"Invite sent from {sender} to {receiver} for task '{task.name}'."
 

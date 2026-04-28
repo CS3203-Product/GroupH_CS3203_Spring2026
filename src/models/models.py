@@ -84,3 +84,11 @@ class ItemRead(ItemBase):
 
     id: int
     owner_id: int
+
+
+class Task(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    owner: str
+
+    __table_args__ = TABLE_ARGS
