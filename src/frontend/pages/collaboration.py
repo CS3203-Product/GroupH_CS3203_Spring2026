@@ -4,7 +4,10 @@ from nicegui import ui
 
 from src.frontend.layouts.default import dashboard_frame, guard_authenticated
 from src.productivity.collaboration_hub import CollaborationHub
-from src.productivity.collaboration_models import CollaborationTask
+from src.productivity.collaboration_models import CollaborationTask, CollaborationInvite
+from sqlmodel import select
+from src.db.session import get_db_context
+from src.models.models import Task
 
 
 class CollaborationDesk:
@@ -57,17 +60,32 @@ class CollaborationDesk:
 
     def refresh_tasks(self) -> None:
         self.task_list.clear()
-        if not self.tasks:
-            with self.task_list:
-                ui.label("No tasks created yet.").classes("text-slate-500")
-            return
 
-        with self.task_list:
-            for task in self.tasks:
-                shared = ", ".join(task.shared_with) if task.shared_with else "No one"
-                ui.label(
-                    f"Task: {task.name} | Owner: {task.owner} | Shared with: {shared}"
-                )
+        with get_db_context() as db:
+            tasks = db.exec(select(Task)).all()
+
+            if not tasks:
+                with self.task_list:
+                    ui.label("No tasks created yet.").classes("text-slate-500")
+                return
+
+            with self.task_list:
+                for task in tasks:
+
+                    accepted_invites = db.exec(
+                        select(CollaborationInvite).where(
+                            CollaborationInvite.task_id == task.id,
+                            CollaborationInvite.status == "accepted",
+                        )
+                    ).all()
+
+                    shared_users = [invite.receiver for invite in accepted_invites]
+
+                    shared = ", ".join(shared_users) if shared_users else "No one"
+
+                    ui.label(
+                        f"Task: {task.name} | Owner: {task.owner} | Shared with: {shared}"
+                    )
 
     def refresh_invites(self) -> None:
         self.invite_list.clear()
@@ -78,29 +96,31 @@ class CollaborationDesk:
                 ui.label("Enter a username to view invites.").classes("text-slate-500")
                 return
 
-            invites = self.hub.view_invites(selected_user)
-            if not invites:
-                ui.label(f"No pending invites for {selected_user}.")
-                return
+            with get_db_context() as db:
+                invites = self.hub.view_invites(db, selected_user)
 
-            for invite in invites:
-                task = invite["task"]
-                with ui.row().classes("items-center gap-2 flex-wrap"):
-                    ui.label(
-                        f"{invite['sender']} → {invite['receiver']} · '{task.name}'"
-                    )
-                    ui.button(
-                        "Accept",
-                        on_click=lambda t=task, u=selected_user: self.accept_invite_gui(
-                            u, t
-                        ),
-                    ).props("dense color=primary")
-                    ui.button(
-                        "Decline",
-                        on_click=lambda t=task, u=selected_user: self.decline_invite_gui(
-                            u, t
-                        ),
-                    ).props("dense outline")
+                if not invites:
+                    ui.label(f"No pending invites for {selected_user}.")
+                    return
+
+                for invite in invites:
+                    task = db.get(Task, invite.task_id)
+                    task_name = task.name if task else "Unknown task"
+
+                    with ui.row().classes("items-center gap-2 flex-wrap"):
+                        ui.label(
+                            f"{invite.sender} → {invite.receiver} · '{task_name}'"
+                        )
+
+                        ui.button(
+                            "Accept",
+                            on_click=lambda invite_id=invite.id: self.accept_invite_gui(invite_id),
+                        ).props("dense color=primary")
+
+                        ui.button(
+                            "Decline",
+                            on_click=lambda invite_id=invite.id: self.decline_invite_gui(invite_id),
+                        ).props("dense outline")
 
     def create_task(self) -> None:
         owner = self.owner_input.value.strip()
@@ -110,11 +130,24 @@ class CollaborationDesk:
             self.result_label.text = "Please enter both owner and task name."
             return
 
-        if self.find_task(task_name):
-            self.result_label.text = "A task with that name already exists."
-            return
+        with get_db_context() as db:
+            existing_task = db.exec(
+                select(Task).where(Task.name == task_name)
+            ).first()
 
-        self.tasks.append(CollaborationTask(task_name, owner))
+            if existing_task:
+                self.result_label.text = "A task with that name already exists."
+                return
+
+            task_row = Task(
+                name=task_name,
+                owner=owner,
+            )
+
+            db.add(task_row)
+            db.commit()
+            db.refresh(task_row)
+
         self.result_label.text = f"Task '{task_name}' created for {owner}."
         self.refresh_tasks()
 
@@ -127,21 +160,36 @@ class CollaborationDesk:
             self.result_label.text = "Please fill in sender, receiver, and task name."
             return
 
-        task = self.find_task(task_name)
-        if not task:
-            self.result_label.text = "Task not found."
-            return
+        with get_db_context() as db:
+            task_row = db.exec(
+                select(Task).where(Task.name == task_name)
+            ).first()
 
-        self.result_label.text = self.hub.send_invite(sender, receiver, task)
+            if not task_row:
+                self.result_label.text = "Task not found."
+                return
+
+            task = CollaborationTask(
+                name=task_row.name,
+                owner=task_row.owner
+            )
+
+            self.result_label.text = self.hub.send_invite(db, sender, receiver, task)
+
         self.refresh_invites()
 
-    def accept_invite_gui(self, user: str, task: CollaborationTask) -> None:
-        self.result_label.text = self.hub.accept_invite(user, task)
+    def accept_invite_gui(self, invite_id: int) -> None:
+        with get_db_context() as db:
+            self.result_label.text = self.hub.accept_invite(db, invite_id)
+
         self.refresh_tasks()
         self.refresh_invites()
 
-    def decline_invite_gui(self, user: str, task: CollaborationTask) -> None:
-        self.result_label.text = self.hub.decline_invite(user, task)
+
+    def decline_invite_gui(self, invite_id: int) -> None:
+        with get_db_context() as db:
+            self.result_label.text = self.hub.decline_invite(db, invite_id)
+
         self.refresh_invites()
 
 

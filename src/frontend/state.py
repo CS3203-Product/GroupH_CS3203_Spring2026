@@ -1,5 +1,9 @@
 from typing import TypedDict
 from nicegui import app
+from jose import jwt, JWTError
+from src.core.config import settings
+from src.core.security import ALGORITHM
+
 
 
 class AuthState(TypedDict):
@@ -10,13 +14,29 @@ class AuthState(TypedDict):
     access_token: str
     token_type: str
 
-
 def get_auth() -> AuthState | None:
     """
-    Retrieves the authentication data from the session storage.
-    Returns None if the user is not logged in.
+    Retrieves authentication data from session storage.
+    If the token is expired or invalid, clear auth and return None.
     """
-    return app.storage.user.get("auth")
+    auth = app.storage.user.get("auth")
+
+    if not auth:
+        return None
+
+    token = auth.get("access_token")
+
+    try:
+        jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[ALGORITHM],
+        )
+    except JWTError:
+        clear_auth()
+        return None
+
+    return auth
 
 
 def set_auth(auth: AuthState) -> None:
