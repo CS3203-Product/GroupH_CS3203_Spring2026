@@ -59,29 +59,50 @@ class CollaborationHub:
         results = db.exec(statement).all()
         return results
 
-    def accept_invite(self, receiver: str, task: CollaborationTask) -> str:
-        for invite in self.invites:
-            if (
-                invite["receiver"] == receiver
-                and invite["task"] == task
-                and invite["status"] == "pending"
-            ):
-                invite["status"] = "accepted"
-                if receiver not in task.shared_with:
-                    task.shared_with.append(receiver)
-                return f"{receiver} accepted invite for task '{task.name}'."
-        return "No pending invite found."
+    def accept_invite(self, db: Session, invite_id: int) -> str:
+        invite = db.get(CollaborationInvite, invite_id)
 
-    def decline_invite(self, receiver: str, task: CollaborationTask) -> str:
-        for invite in self.invites:
-            if (
-                invite["receiver"] == receiver
-                and invite["task"] == task
-                and invite["status"] == "pending"
-            ):
-                invite["status"] = "declined"
-                return f"{receiver} declined invite for task '{task.name}'."
-        return "No pending invite found."
+        if not invite:
+            return "Invite not found."
 
-    def can_view_task(self, user: str, task: CollaborationTask) -> bool:
-        return user == task.owner or user in task.shared_with
+        if invite.status != "pending":
+            return "Invite is not pending."
+
+        invite.status = "accepted"
+
+        db.add(invite)
+        db.commit()
+        db.refresh(invite)
+
+        return f"{invite.receiver} accepted invite from {invite.sender}."
+
+    def decline_invite(self, db: Session, invite_id: int) -> str:
+        invite = db.get(CollaborationInvite, invite_id)
+
+        if not invite:
+            return "Invite not found."
+
+        if invite.status != "pending":
+            return "Invite is not pending."
+
+        invite.status = "declined"
+
+        db.add(invite)
+        db.commit()
+        db.refresh(invite)
+
+        return f"{invite.receiver} declined invite from {invite.sender}."
+
+    def can_view_task(self, db: Session, user: str, task: Task) -> bool:
+        if user == task.owner:
+            return True
+
+        accepted_invite = db.exec(
+            select(CollaborationInvite).where(
+                CollaborationInvite.receiver == user,
+                CollaborationInvite.task_id == task.id,
+                CollaborationInvite.status == "accepted",
+            )
+        ).first()
+
+        return accepted_invite is not None
