@@ -4,7 +4,11 @@ from contextlib import contextmanager
 from src.core.config import settings
 
 engine = create_engine(settings.DATABASE_URL, echo=True)
-
+SessionLocal = Session(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
 
 def get_db():
     """

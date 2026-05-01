@@ -1,4 +1,4 @@
-"""Grid scheduler logic (importance × weekday)."""
+"""Grid scheduler logic (importance weekday)."""
 
 from src.productivity.scheduling_task import SchedulingTask as Task
 
