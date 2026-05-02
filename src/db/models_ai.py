@@ -6,39 +6,73 @@ from sqlalchemy import (
     Float,
     Boolean,
     DateTime,
-    ForeignKey,
     String
 )
 
-from sqlalchemy.orm import relationship
 
-from sqlalchemy.orm import declarative_base
-Base = declarative_base()
+from src.db.base import Base
 
 class TaskExecutionLog(Base):
     __tablename__ = "task_execution_logs"
 
     id = Column(Integer, primary_key=True)
 
-    user_id = Column(Integer, nullable=False)
+    # =====================================
+    # IDENTIFIERS
+    # =====================================
 
+    user_id = Column(Integer, nullable=False)
     task_id = Column(Integer, nullable=False)
 
-    category = Column(String, default="general")
+    # =====================================
+    # TASK METADATA
+    # =====================================
 
-    start_time = Column(DateTime)
-
-    end_time = Column(DateTime)
+    category = Column(String)
+    difficulty = Column(Integer)
+    user_importance = Column(Integer)
 
     estimated_duration = Column(Float)
-
     actual_duration = Column(Float)
 
-    was_completed = Column(Boolean, default=False)
+    # =====================================
+    # TIMING
+    # =====================================
 
-    was_delayed = Column(Boolean, default=False)
+    assigned_at = Column(DateTime)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    deadline = Column(DateTime)
 
-    delay_amount = Column(Float, default=0.0)
+    # =====================================
+    # OUTCOMES
+    # =====================================
+    was_completed = Column(Boolean)
+    was_delayed = Column(Boolean)
+    missed_deadline = Column(Boolean)
+
+    delay_amount = Column(Float)
+
+    completion_quality = Column(Float)
+
+    # =====================================
+    # PRODUCTIVITY SIGNALS
+    # =====================================
+    
+    focus_score = Column(Float)
+    stress_level = Column(Float)
+
+    interruptions = Column(Integer)
+    reschedule_count = Column(Integer)
+
+    # =====================================
+    # CONTEXT
+    # =====================================
+
+    day_of_week = Column(Integer)
+    hour_started = Column(Integer)
+
+    session_type = Column(String)
 
     created_at = Column(DateTime)
 

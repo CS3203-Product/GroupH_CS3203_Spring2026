@@ -1,67 +1,163 @@
-"""
-Feature Builder for AI models.
-
-Builds feature vectors from task and user data for ML inference.
-"""
-
 from datetime import datetime
-from typing import Dict, Any, Optional
 
 
-def build_task_features(task, user_stats: Optional[Dict] = None) -> Dict[str, Any]:
+# =========================================================
+# CATEGORY ENCODING
+# =========================================================
+
+CATEGORY_MAP = {
+    "study": 0,
+    "programming": 1,
+    "reading": 2,
+    "exercise": 3,
+    "meeting": 4,
+    "general": 5
+}
+
+
+# =========================================================
+# FIXED FEATURE ORDER
+# VERY IMPORTANT FOR ML CONSISTENCY
+# =========================================================
+
+FEATURE_ORDER = [
+    "difficulty",
+    "importance",
+    "category",
+    "estimated_duration",
+    "hours_until_deadline",
+    "deadline_day",
+    "deadline_hour",
+    "completion_rate",
+    "avg_delay",
+    "avg_task_duration",
+    "overdue_tasks",
+    "predicted_duration"
+]
+
+
+# =========================================================
+# TASK FEATURE BUILDER
+# =========================================================
+
+
+def build_task_features(task, user_stats=None):
     """
-    Build feature dictionary from a task.
-    
-    Args:
-        task: Task object with attributes
-        user_stats: Optional user statistics dict
-    
-    Returns:
-        Dictionary of features for ML model
+    Builds ML-ready features for task prediction.
+
+    Parameters:
+    - task:
+        task object from database
+
+    - user_stats:
+        UserBehaviorStats object
     """
-    features = {}
-    
-    # Task properties
-    features["task_id"] = getattr(task, "id", 0)
-    features["user_id"] = getattr(task, "user_id", 0)
-    features["estimated_duration"] = getattr(task, "estimated_duration", 1.0)
-    features["user_importance"] = getattr(task, "user_importance", 1.0)
-    features["difficulty"] = getattr(task, "difficulty", 3)
-    
-    # Category encoding
-    category = getattr(task, "category", "general")
-    features["category_encoded"] = _encode_category(category)
-    
-    # Time-based features
+
     now = datetime.utcnow()
-    deadline = getattr(task, "deadline", now)
-    
-    if deadline:
-        delta = deadline - now
-        hours_until_deadline = delta.total_seconds() / 3600
-    else:
-        hours_until_deadline = 24.0
-    
-    features["hours_until_deadline"] = max(hours_until_deadline, 0.1)
-    features["deadline_day"] = deadline.weekday() if hasattr(deadline, "weekday") else 0
-    features["deadline_hour"] = getattr(deadline, "hour", 12) if hasattr(deadline, "hour") else 12
-    
-    # User stats features
+
+    # =====================================================
+    # SAFE DEADLINE CALCULATION
+    # =====================================================
+
+    hours_until_deadline = 72
+    deadline_day = 0
+    deadline_hour = 12
+
+    if getattr(task, "deadline", None):
+
+        delta = task.deadline - now
+
+        hours_until_deadline = (
+            delta.total_seconds() / 3600
+        )
+
+        deadline_day = task.deadline.weekday()
+        deadline_hour = task.deadline.hour
+
+    # Prevent extreme negative values
+    hours_until_deadline = max(
+        hours_until_deadline,
+        -72
+    )
+
+    # =====================================================
+    # CATEGORY ENCODING
+    # =====================================================
+
+    category = CATEGORY_MAP.get(
+        getattr(task, "category", "general"),
+        CATEGORY_MAP["general"]
+    )
+
+    # =====================================================
+    # BASE FEATURES
+    # =====================================================
+
+    features = {
+        "difficulty": float(
+            getattr(task, "difficulty", 5)
+        ),
+
+        "importance": float(
+            getattr(task, "user_importance", 5)
+        ),
+
+        "category": float(category),
+
+        "estimated_duration": float(
+            getattr(task, "estimated_duration", 1)
+        ),
+
+        "hours_until_deadline": float(
+            hours_until_deadline
+        ),
+
+        "deadline_day": float(deadline_day),
+
+        "deadline_hour": float(deadline_hour),
+
+        # Default placeholders
+        "completion_rate": 0.5,
+        "avg_delay": 0.0,
+        "avg_task_duration": 1.0,
+        "overdue_tasks": 0,
+
+        # Only used in priority model
+        "predicted_duration": 1.0
+    }
+
+    # =====================================================
+    # USER BEHAVIOR FEATURES
+    # =====================================================
+
     if user_stats:
-        features["user_completion_rate"] = user_stats.get("completion_rate", 0.5)
-        features["user_avg_delay"] = user_stats.get("avg_delay", 0.0)
-        features["user_avg_duration"] = user_stats.get("avg_task_duration", 1.0)
-        features["user_overdue_tasks"] = user_stats.get("overdue_tasks", 0)
-    else:
-        features["user_completion_rate"] = 0.5
-        features["user_avg_delay"] = 0.0
-        features["user_avg_duration"] = 1.0
-        features["user_overdue_tasks"] = 0
-    
+
+        features.update({
+            "completion_rate": float(
+                getattr(user_stats, "completion_rate", 0.5)
+            ),
+
+            "avg_delay": float(
+                getattr(user_stats, "avg_delay", 0)
+            ),
+
+            "avg_task_duration": float(
+                getattr(user_stats, "avg_task_duration", 1)
+            ),
+
+            "overdue_tasks": float(
+                getattr(user_stats, "overdue_tasks", 0)
+            )
+        })
+
     return features
 
 
-def build_priority_features(task, user_stats: Optional[Dict], duration: float) -> Dict[str, Any]:
+def build_priority_features(
+    task,
+    user_stats,
+    predicted_duration
+):
     """
     Build feature dictionary for priority prediction.
     
@@ -73,93 +169,47 @@ def build_priority_features(task, user_stats: Optional[Dict], duration: float) -
     Returns:
         Dictionary of features for priority model
     """
-    features = build_task_features(task, user_stats)
-    
-    # Add duration-related features
-    features["predicted_duration"] = duration
-    
-    # Workload features
-    now = datetime.utcnow()
-    deadline = getattr(task, "deadline", now)
-    
-    if hasattr(deadline, "total_seconds"):
-        hours_left = deadline.total_seconds() / 3600
-    else:
-        hours_left = 24.0
-    
-    features["workload_ratio"] = duration / max(hours_left, 0.1)
-    features["urgency_score"] = 1.0 / max(hours_left, 1.0)
-    
+    features = build_task_features(
+        task,
+        user_stats
+    )
+
+    features["predicted_duration"] = float(
+        predicted_duration
+    )
+
     return features
 
 
-def _encode_category(category: str) -> int:
-    """Encode category string to integer."""
-    category_map = {
-        "study": 0,
-        "homework": 1,
-        "project": 2,
-        "exam": 3,
-        "reading": 4,
-        "practice": 5,
-        "review": 6,
-        "general": 7
-    }
-    return category_map.get(category.lower(), 7)
+# =========================================================
+# FEATURE VECTOR EXTRACTION
+# =========================================================
 
 
-def extract_feature_vector(features: Dict[str, Any]) -> list:
+def extract_feature_vector(features):
     """
-    Extract ordered feature vector for model input.
-    
-    Args:
-        features: Feature dictionary
-    
-    Returns:
-        List of features in order
+    Converts feature dictionary into
+    ordered ML vector.
     """
-    key_order = [
-        "estimated_duration",
-        "user_importance",
-        "difficulty",
-        "category_encoded",
-        "hours_until_deadline",
-        "deadline_day",
-        "deadline_hour",
-        "user_completion_rate",
-        "user_avg_delay",
-        "user_avg_duration",
-        "user_overdue_tasks"
-    ]
-    
-    return [features.get(key, 0.0) for key in key_order]
+
+    vector = []
+
+    for feature_name in FEATURE_ORDER:
+
+        value = features.get(feature_name, 0)
+
+        try:
+            vector.append(float(value))
+
+        except Exception:
+            vector.append(0.0)
+
+    return vector
 
 
-def extract_priority_vector(features: Dict[str, Any]) -> list:
+def extract_priority_vector(features):
     """
-    Extract ordered feature vector for priority model.
-    
-    Args:
-        features: Feature dictionary
-    
-    Returns:
-        List of features in order
+    Compatibility wrapper for priority vector extraction.
     """
-    key_order = [
-        "estimated_duration",
-        "user_importance",
-        "difficulty",
-        "category_encoded",
-        "hours_until_deadline",
-        "deadline_day",
-        "deadline_hour",
-        "user_completion_rate",
-        "user_avg_delay",
-        "user_avg_duration",
-        "user_overdue_tasks",
-        "predicted_duration",
-        "workload_ratio",
-        "urgency_score"
-    ]
-    
-    return [features.get(key, 0.0) for key in key_order]
+
+    return extract_feature_vector(features)

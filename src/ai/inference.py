@@ -1,7 +1,8 @@
 from src.ai.feature_builder import (
     build_task_features,
     build_priority_features,
-    extract_feature_vector
+    extract_feature_vector,
+    extract_priority_vector
 )
 
 from src.ai.model_loader import (
@@ -59,7 +60,7 @@ def predict_priority(task, user_stats, duration):
         duration
     )
 
-    vector = extract_feature_vector(features)
+    vector = extract_priority_vector(features)
 
     prediction = model.predict([vector])[0]
 

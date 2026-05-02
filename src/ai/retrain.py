@@ -8,7 +8,8 @@ from sklearn.ensemble import RandomForestRegressor
 from src.ai.feature_builder import (
     build_task_features,
     build_priority_features,
-    extract_feature_vector
+    extract_feature_vector,
+    extract_priority_vector
 )
 
 from src.db.models_ai import TaskExecutionLog
@@ -95,7 +96,7 @@ def train_priority_model(session):
             duration
         )
 
-        X.append(extract_feature_vector(features))
+        X.append(extract_priority_vector(features))
 
         # Example target:
         # delayed tasks should have higher priority
