@@ -3,8 +3,13 @@ from pydantic import BaseModel
 from datetime import datetime
 from DistractionBlocker import DistractionBlocker
 from db import get_blocked_sites, add_blocked_site, delete_blocked_site
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_methods=["*"] , allow_headers=["*"], 
+)
 
 blocker = DistractionBlocker()
 

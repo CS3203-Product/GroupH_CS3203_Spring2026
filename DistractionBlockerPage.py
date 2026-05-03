@@ -45,6 +45,15 @@ async def main():
                     ui.button('Remove', on_click=lambda s=site: remove_site(s, refresh_list), color='red-5').props('flat dense')
 
     await refresh_list()
+    ui.add_head_html("""
+    <script>
+      window.addEventListener('beforeunload', function(e) {
+        e.preventDefault();
+        e.returnValue = '';
+      });
+    </script>
+    """)
+
 
 if __name__ in {"__main__", "__mp_main__"}:
     ui.run(port=8080)
