@@ -112,10 +112,10 @@ class BehaviorTracker:
 
         for log in logs:
 
-            if not log.start_time:
+            if not log.started_at:
                 continue
 
-            hour = log.start_time.hour
+            hour = log.started_at.hour
 
             if log.was_completed:
                 hour_scores[hour] += 2
@@ -140,10 +140,10 @@ class BehaviorTracker:
 
         for log in logs:
 
-            if not log.start_time:
+            if not log.started_at:
                 continue
 
-            weekday = log.start_time.weekday()
+            weekday = log.started_at.weekday()
 
             if log.was_completed:
                 day_scores[weekday] += 1

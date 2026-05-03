@@ -1,14 +1,17 @@
-from sqlmodel import create_engine, Session
 from contextlib import contextmanager
+from sqlalchemy.orm import sessionmaker
+from sqlmodel import Session, create_engine
 
 from src.core.config import settings
 
 engine = create_engine(settings.DATABASE_URL, echo=True)
-SessionLocal = Session(
+SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
-    bind=engine
+    bind=engine,
+    class_=Session,
 )
+
 
 def get_db():
     """

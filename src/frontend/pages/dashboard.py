@@ -305,6 +305,17 @@ class DashboardView:
                 "w-full mt-3"
             ).props("dense flat bordered")
 
+    def _get_current_user_id(self) -> int | None:
+        try:
+            with get_db_context() as db:
+                current_user = get_current_user_from_state(db)
+            return current_user.id
+        except HTTPException as e:
+            notifications.show_error(e.detail)
+        except Exception as e:
+            notifications.show_error(f"Could not resolve user: {e}")
+        return None
+
     def _add_task(
         self,
         title_in: ui.input,
@@ -315,9 +326,19 @@ class DashboardView:
         if not title:
             notifications.show_error("Please enter a task title.")
             return
+
+        user_id = self._get_current_user_id()
+        if user_id is None:
+            return
+
         task_id = f"manual-{len(self.analytics._tasks) + 1}-{title[:12]}"
         try:
-            self.analytics.add_task(task_id, title, category=cat_in.value)
+            self.analytics.add_task(
+                task_id,
+                title,
+                category=cat_in.value,
+                user_id=user_id,
+            )
         except KeyError:
             notifications.show_error("A task with that ID already exists.")
             return

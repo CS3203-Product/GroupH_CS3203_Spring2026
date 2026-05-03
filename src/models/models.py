@@ -52,15 +52,16 @@ class ItemBase(SQLModel):
 class ItemCreate(ItemBase):
     """Inherits from ItemBase and is used for validating the data when a new item is created."""
 
-    pass
+    completed: bool = False
 
 
 class ItemUpdate(SQLModel):
-    """Used for updating an existing item. Its fields (title, description) are optional,
+    """Used for updating an existing item. Its fields are optional,
     allowing for partial updates where only the changed fields need to be provided."""
 
     title: Optional[str] = None
     description: Optional[str] = None
+    completed: Optional[bool] = None
 
 
 class Item(ItemBase, table=True):

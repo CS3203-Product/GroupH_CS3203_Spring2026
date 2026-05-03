@@ -6,6 +6,10 @@ from src.db.session import get_db_context
 from src.frontend.components import notifications
 from src.frontend.components.auth_utils import get_current_user_from_state
 from src.frontend.layouts.default import dashboard_frame, guard_authenticated
+from src.ai.inference import predict_duration, predict_priority
+from src.ai.services import task_logger, behavior_tracker
+from src.ai.user_stats_service import get_user_stats, rebuild_user_stats
+from src.ai.auto_retrain import trigger_background_retrain
 
 
 @ui.page("/items")
@@ -28,7 +32,10 @@ def items_page():
             ui.button(
                 "Create",
                 on_click=lambda: create_item(
-                    title_input, desc_input, dialog, items_grid
+                    title_input,
+                    desc_input,
+                    dialog,
+                    items_grid,
                 ),
             ).classes("w-full")
 
@@ -41,17 +48,31 @@ async def load_items(grid: ui.grid):
     try:
         with get_db_context() as db:
             current_user = get_current_user_from_state(db)
+            user_stats = get_user_stats(db, current_user.id)
             items = item_repo.get_for_user(db=db, current_user=current_user)
 
         grid.clear()
         with grid:
             for item in items:
+                if getattr(item, "completed", False):
+                    continue
                 with ui.card().classes("p-0"):
                     ui.image(f"https://picsum.photos/600/400?random={item.id}")
                     with ui.column().classes("p-4 w-full"):
                         ui.label(item.title).classes("text-xl font-semibold")
                         ui.separator().classes("w-full my-1")
                         ui.label(item.description).classes("text-sm line-clamp-3")
+                        
+                        # AI Predictions
+                        try:
+                            pred_duration = predict_duration(item, user_stats)
+                            pred_priority = predict_priority(item, user_stats, pred_duration)
+                            
+                            with ui.row().classes("w-full gap-2 mt-2 mb-2"):
+                                ui.badge(f"Est: {pred_duration:.1f}h").props("color=blue")
+                                ui.badge(f"Priority: {pred_priority:.1f}/10").props("color=orange")
+                        except Exception as e:
+                            ui.label("Predictions unavailable").classes("text-xs text-gray-400")
 
                         with ui.row().classes("w-full justify-end mt-4 gap-2"):
                             # Modify Button - opens its own dialog
@@ -72,13 +93,24 @@ async def load_items(grid: ui.grid):
                                     on_click=lambda i=item,
                                     t=modify_title,
                                     d=modify_desc: update_item(
-                                        i.id, t, d, modify_dialog, grid
+                                        i.id,
+                                        t,
+                                        d,
+                                        modify_dialog,
+                                        grid,
                                     ),
                                 ).classes("w-full")
 
                             ui.button(icon="edit", on_click=modify_dialog.open).props(
                                 "flat dense"
                             )
+
+                            ui.button(
+                                icon="task_alt",
+                                on_click=lambda item=item: ui.run_async(
+                                    complete_item(item, grid)
+                                ),
+                            ).props("flat dense color=green")
 
                             # Delete Button - opens a confirmation dialog
                             with ui.dialog() as confirm_dialog, ui.card():
@@ -109,8 +141,38 @@ async def load_items(grid: ui.grid):
         notifications.show_error(f"An unexpected error occurred: {e}")
 
 
+async def complete_item(
+    item,
+    grid: ui.grid,
+):
+    try:
+        with get_db_context() as db:
+            current_user = get_current_user_from_state(db)
+            item_repo.update_for_user(
+                db=db,
+                item_id=item.id,
+                obj_in=ItemUpdate(completed=True),
+                current_user=current_user,
+            )
+
+            task_logger.log_task_started(item)
+            task_logger.log_task_completed(item)
+            rebuild_user_stats(db, item.owner_id)
+
+        behavior_tracker.build_behavior_profile(item.owner_id)
+        trigger_background_retrain()
+
+        notifications.show_success(f"Task '{item.title}' logged as completed.")
+        await load_items(grid)
+    except Exception as e:
+        notifications.show_error(f"Could not log task completion: {e}")
+
+
 async def create_item(
-    title_input: ui.input, desc_input: ui.textarea, dialog: ui.dialog, grid: ui.grid
+    title_input: ui.input,
+    desc_input: ui.textarea,
+    dialog: ui.dialog,
+    grid: ui.grid,
 ):
     """Creates a new item by directly calling repository functions."""
     try:
@@ -149,6 +211,7 @@ async def update_item(
 
         notifications.show_success("Item updated successfully.")
         dialog.close()
+        trigger_background_retrain()
         await load_items(grid)
 
     except HTTPException as e:
@@ -165,6 +228,7 @@ async def delete_item(item_id: int, grid: ui.grid):
             item_repo.delete_for_user(db=db, item_id=item_id, current_user=current_user)
 
         notifications.show_success("Item deleted successfully.")
+        trigger_background_retrain()
         await load_items(grid)
 
     except HTTPException as e:

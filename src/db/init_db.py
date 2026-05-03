@@ -3,6 +3,7 @@ from src.core.config import settings
 from src.repositories.user import user_repo
 from src.models import models
 from src.db.session import engine
+from src.db import models_ai
 
 
 def init() -> None:

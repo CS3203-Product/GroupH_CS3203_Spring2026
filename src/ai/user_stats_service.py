@@ -1,6 +1,20 @@
 from sqlalchemy import func
 
-from db.models_ai import TaskExecutionLog, UserBehaviorStats
+from src.db.models_ai import TaskExecutionLog, UserBehaviorStats
+
+
+# =========================================================
+# GET OR CREATE USER STATS
+# =========================================================
+
+def get_user_stats(session, user_id):
+    """Get user stats or create default if not exists."""
+    stats = session.query(UserBehaviorStats).filter_by(user_id=user_id).first()
+    
+    if not stats:
+        return rebuild_user_stats(session, user_id)
+    
+    return stats
 
 
 # =========================================================

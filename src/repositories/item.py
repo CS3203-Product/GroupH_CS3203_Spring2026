@@ -2,6 +2,7 @@ from typing import Optional, List
 from fastapi import HTTPException
 from sqlmodel import Session, select
 from src.models.models import Item, ItemCreate, ItemUpdate, User
+from src.ai.auto_retrain import trigger_background_retrain
 
 
 class ItemRepository:
@@ -47,11 +48,16 @@ class ItemRepository:
     ) -> Item:
         """
         Updates an item for the current user, first checking for permissions.
+        Triggers background model retraining after update.
         """
         item_to_update = self.get_with_permission(
             db=db, id=item_id, current_user=current_user
         )
         item = self.update(db=db, db_obj=item_to_update, obj_in=obj_in)
+        
+        # Trigger background retrain (non-blocking)
+        trigger_background_retrain()
+        
         return item
 
     def delete_for_user(self, db: Session, *, item_id: int, current_user: User):
