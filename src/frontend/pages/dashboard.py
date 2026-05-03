@@ -9,6 +9,7 @@ from src.db.session import get_db_context
 from src.frontend.components import notifications
 from src.frontend.components.auth_utils import get_current_user_from_state
 from src.frontend.layouts.default import dashboard_frame, guard_authenticated
+from src.models.models import ItemCreate, ItemUpdate
 from src.productivity.task_analytics_dashboard import TaskAnalyticsDashboard
 from src.repositories.item import item_repo
 
@@ -142,6 +143,7 @@ class DashboardView:
 
     def __init__(self) -> None:
         self.analytics = TaskAnalyticsDashboard()
+        self._analytics_column: ui.column | None = None
 
     def _sync_from_db(self) -> tuple[int, str]:
         """Seed analytics from the user's persisted items. Returns (item_count, first_name)."""
@@ -159,7 +161,16 @@ class DashboardView:
             for item in items:
                 task_id = f"item-{item.id}"
                 if task_id not in self.analytics._tasks:
-                    self.analytics.add_task(task_id, item.title, category="tasks")
+                    self.analytics.add_task(
+                        task_id,
+                        item.title,
+                        category=item.category or "general",
+                    )
+                rec = self.analytics.get_task(task_id)
+                rec.title = item.title
+                rec.category = item.category or "general"
+                rec.time_spent_minutes = float(item.time_spent_minutes or 0)
+                rec.is_completed = bool(item.is_completed)
             return len(items), first_name
         except HTTPException as e:
             notifications.show_error(e.detail)
@@ -169,12 +180,19 @@ class DashboardView:
             return 0, ""
 
     def build(self) -> None:
-        item_count, first_name = self._sync_from_db()
+        self._sync_from_db()
 
+        self._analytics_column = ui.column().classes("w-full")
+        with self._analytics_column:
+            self._render_analytics_section()
+
+        self._build_tracker_panel()
+
+    def _render_analytics_section(self) -> None:
+        """Stat cards and charts; re-rendered after tracker actions."""
         total = self.analytics.total_tasks
         completed = self.analytics.completed_tasks
         pending = total - completed
-        rate = self.analytics.completion_rate
         time_spent = self.analytics.total_time_spent
 
         with ui.row().classes(
@@ -219,7 +237,53 @@ class DashboardView:
                     "text-slate-500 dark:text-slate-400 py-4 text-center w-full"
                 )
 
-        self._build_tracker_panel()
+    def _refresh_analytics_section(self) -> None:
+        if self._analytics_column is None:
+            return
+        self._analytics_column.clear()
+        with self._analytics_column:
+            self._render_analytics_section()
+
+    @staticmethod
+    def _numeric_item_id(task_id: str) -> int | None:
+        prefix = "item-"
+        if not task_id.startswith(prefix):
+            return None
+        try:
+            return int(task_id[len(prefix) :])
+        except ValueError:
+            return None
+
+    def _persist_log_time(self, task_id: str, minutes: float) -> None:
+        item_id = self._numeric_item_id(task_id)
+        if item_id is None:
+            return
+        with get_db_context() as db:
+            current_user = get_current_user_from_state(db)
+            item = item_repo.get_with_permission(
+                db=db, id=item_id, current_user=current_user
+            )
+            new_total = float(item.time_spent_minutes or 0) + minutes
+            item_repo.update(
+                db=db,
+                db_obj=item,
+                obj_in=ItemUpdate(time_spent_minutes=new_total),
+            )
+
+    def _persist_mark_done(self, task_id: str) -> None:
+        item_id = self._numeric_item_id(task_id)
+        if item_id is None:
+            return
+        with get_db_context() as db:
+            current_user = get_current_user_from_state(db)
+            item = item_repo.get_with_permission(
+                db=db, id=item_id, current_user=current_user
+            )
+            item_repo.update(
+                db=db,
+                db_obj=item,
+                obj_in=ItemUpdate(is_completed=True),
+            )
 
     def _build_tracker_panel(self) -> None:
         """Quick-add panel for tracking tasks, completion, and time."""
@@ -275,6 +339,9 @@ class DashboardView:
             if not t.is_completed
         }
         self._log_select.options = opts
+        cur = self._log_select.value
+        if cur is not None and str(cur) not in opts:
+            self._log_select.value = None
         self._log_select.update()
 
     def _refresh_task_table(self, container: ui.column) -> None:
@@ -315,17 +382,39 @@ class DashboardView:
         if not title:
             notifications.show_error("Please enter a task title.")
             return
-        task_id = f"manual-{len(self.analytics._tasks) + 1}-{title[:12]}"
         try:
-            self.analytics.add_task(task_id, title, category=cat_in.value)
+            with get_db_context() as db:
+                current_user = get_current_user_from_state(db)
+                item = item_repo.create_for_user(
+                    db=db,
+                    obj_in=ItemCreate(
+                        title=title,
+                        description=None,
+                        category=cat_in.value or "general",
+                    ),
+                    current_user=current_user,
+                )
+        except HTTPException as e:
+            notifications.show_error(str(e.detail))
+            return
+        except Exception as e:
+            notifications.show_error(f"Could not create task: {e}")
+            return
+        task_id = f"item-{item.id}"
+        try:
+            self.analytics.add_task(
+                task_id,
+                item.title,
+                category=item.category or "general",
+            )
         except KeyError:
-            notifications.show_error("A task with that ID already exists.")
+            notifications.show_error("That task is already on the tracker.")
             return
         title_in.value = ""
         notifications.show_success(f"Task '{title}' added.")
         self._refresh_task_table(table_container)
         self._refresh_select()
-        ui.navigate.to("/dashboard")
+        self._refresh_analytics_section()
 
     def _log_time(
         self,
@@ -333,37 +422,50 @@ class DashboardView:
         minutes_in: ui.number,
         table_container: ui.column,
     ) -> None:
-        task_id = select.value
-        if not task_id:
+        raw_id = select.value
+        if not raw_id:
             notifications.show_error("Select a task first.")
             return
+        task_id = str(raw_id)
+        minutes = float(minutes_in.value or 0)
         try:
-            self.analytics.log_time(task_id, float(minutes_in.value or 0))
+            if self._numeric_item_id(task_id) is not None:
+                self._persist_log_time(task_id, minutes)
+            self.analytics.log_time(task_id, minutes)
+        except HTTPException as e:
+            notifications.show_error(str(e.detail))
+            return
         except (KeyError, ValueError) as e:
             notifications.show_error(str(e))
             return
         notifications.show_success("Time logged.")
         self._refresh_task_table(table_container)
-        ui.navigate.to("/dashboard")
+        self._refresh_analytics_section()
 
     def _mark_done(
         self,
         select: ui.select,
         table_container: ui.column,
     ) -> None:
-        task_id = select.value
-        if not task_id:
+        raw_id = select.value
+        if not raw_id:
             notifications.show_error("Select a task first.")
             return
+        task_id = str(raw_id)
         try:
+            if self._numeric_item_id(task_id) is not None:
+                self._persist_mark_done(task_id)
             self.analytics.complete_task(task_id)
+        except HTTPException as e:
+            notifications.show_error(str(e.detail))
+            return
         except KeyError as e:
             notifications.show_error(str(e))
             return
         notifications.show_success("Task marked as complete!")
         self._refresh_task_table(table_container)
         self._refresh_select()
-        ui.navigate.to("/dashboard")
+        self._refresh_analytics_section()
 
 
 def _get_first_name() -> str:

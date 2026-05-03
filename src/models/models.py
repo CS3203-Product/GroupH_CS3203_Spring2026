@@ -52,7 +52,7 @@ class ItemBase(SQLModel):
 class ItemCreate(ItemBase):
     """Inherits from ItemBase and is used for validating the data when a new item is created."""
 
-    pass
+    category: str = Field(default="general")
 
 
 class ItemUpdate(SQLModel):
@@ -61,6 +61,9 @@ class ItemUpdate(SQLModel):
 
     title: Optional[str] = None
     description: Optional[str] = None
+    category: Optional[str] = None
+    time_spent_minutes: Optional[float] = None
+    is_completed: Optional[bool] = None
 
 
 class Item(ItemBase, table=True):
@@ -69,6 +72,9 @@ class Item(ItemBase, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
+    category: str = Field(default="general")
+    time_spent_minutes: float = Field(default=0.0)
+    is_completed: bool = Field(default=False)
     owner_id: Optional[int] = Field(
         default=None, foreign_key=f"{settings.SCHEMA_NAME}.user.id"
     )
@@ -84,6 +90,9 @@ class ItemRead(ItemBase):
 
     id: int
     owner_id: int
+    category: str = "general"
+    time_spent_minutes: float = 0.0
+    is_completed: bool = False
 
 
 class Task(SQLModel, table=True):
