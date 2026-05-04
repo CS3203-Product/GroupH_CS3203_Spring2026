@@ -1,201 +1,203 @@
-"""Collaboration hub UI (tasks + invites)."""
-
 from nicegui import ui
-
-from src.frontend.layouts.default import dashboard_frame, guard_authenticated
-from src.productivity.collaboration_hub import CollaborationHub
-from src.productivity.collaboration_models import CollaborationTask, CollaborationInvite
 from sqlmodel import select
+
 from src.db.session import get_db_context
-from src.models.models import Task
+from src.models.models import Item, User
+from src.productivity.collaboration_hub import CollaborationHub
+from src.productivity.collaboration_models import CollaborationInvite
+from src.frontend.components.auth_utils import get_current_user_from_state
 
 
-class CollaborationDesk:
-    def __init__(self) -> None:
+class CollaborationPage:
+    def __init__(self):
         self.hub = CollaborationHub()
-        self.tasks: list[CollaborationTask] = []
 
-    def find_task(self, task_name: str) -> CollaborationTask | None:
-        for task in self.tasks:
-            if task.name == task_name:
-                return task
-        return None
+        self.task_title_input = None
+        self.receiver_email_input = None
+        self.status_label = None
+        self.invites_container = None
+        self.shared_tasks_container = None
 
-    def build(self) -> None:
-        ui.label("Collaboration hub").classes(
-            "text-h5 font-bold text-emerald-800 dark:text-emerald-200"
-        )
+    def render(self):
+        ui.label("Collaboration Hub").classes("text-3xl font-bold mb-4")
 
-        with ui.card().classes("w-full max-w-xl p-4"):
-            ui.label("Create task").classes("text-lg font-semibold")
-            self.owner_input = ui.input("Task owner")
-            self.task_input = ui.input("Task name")
-            ui.button("Create task", on_click=self.create_task).props("color=primary")
+        with ui.card().classes("w-full max-w-2xl p-4"):
+            ui.label("Send Task Invite").classes("text-xl font-semibold")
 
-        with ui.card().classes("w-full max-w-xl p-4"):
-            ui.label("Send invite").classes("text-lg font-semibold")
-            self.sender_input = ui.input("Sender")
-            self.receiver_input = ui.input("Receiver")
-            self.invite_task_input = ui.input("Task name")
-            ui.button("Send invite", on_click=self.send_invite_gui).props(
-                "color=primary"
-            )
+            self.task_title_input = ui.input("Task title").classes("w-full")
+            self.receiver_email_input = ui.input("Receiver email").classes("w-full")
 
-        with ui.card().classes("w-full max-w-xl p-4"):
-            ui.label("Pending invites").classes("text-lg font-semibold")
-            self.invite_user_input = ui.input("Username")
-            ui.button("Refresh invites", on_click=self.refresh_invites).props("outline")
-            self.invite_list = ui.column()
+            ui.button("Send Invite", on_click=self.send_invite).classes("mt-2")
 
-        with ui.card().classes("w-full max-w-xl p-4"):
-            ui.label("All tasks").classes("text-lg font-semibold")
-            self.task_list = ui.column()
+            self.status_label = ui.label("").classes("mt-2 text-sm")
 
-        with ui.card().classes("w-full max-w-xl p-4"):
-            ui.label("Status").classes("text-lg font-semibold")
-            self.result_label = ui.label("Ready.")
+        with ui.card().classes("w-full max-w-2xl p-4 mt-4"):
+            ui.label("Pending Invites").classes("text-xl font-semibold")
 
-        self.refresh_tasks()
+            self.invites_container = ui.column().classes("w-full")
+            ui.button("Refresh Invites", on_click=self.refresh_invites).classes("mt-2")
+
+        with ui.card().classes("w-full max-w-2xl p-4 mt-4"):
+            ui.label("Accessible Tasks").classes("text-xl font-semibold")
+
+            self.shared_tasks_container = ui.column().classes("w-full")
+            ui.button("Refresh Tasks", on_click=self.refresh_accessible_tasks).classes("mt-2")
+
         self.refresh_invites()
+        self.refresh_accessible_tasks()
 
-    def refresh_tasks(self) -> None:
-        self.task_list.clear()
+    def send_invite(self):
+        task_title = self.task_title_input.value.strip()
+        receiver_email = self.receiver_email_input.value.strip()
+
+        if not task_title:
+            self.status_label.text = "Please enter a task title."
+            return
+
+        if not receiver_email:
+            self.status_label.text = "Please enter a receiver email."
+            return
 
         with get_db_context() as db:
-            tasks = db.exec(select(Task)).all()
+            current_user = get_current_user_from_state(db)
 
-            if not tasks:
-                with self.task_list:
-                    ui.label("No tasks created yet.").classes("text-slate-500")
+            if not current_user:
+                self.status_label.text = "You must be logged in to send invites."
                 return
 
-            with self.task_list:
-                for task in tasks:
+            receiver = db.exec(
+                select(User).where(User.email == receiver_email)
+            ).first()
 
-                    accepted_invites = db.exec(
-                        select(CollaborationInvite).where(
-                            CollaborationInvite.task_id == task.id,
-                            CollaborationInvite.status == "accepted",
-                        )
-                    ).all()
-
-                    shared_users = [invite.receiver for invite in accepted_invites]
-
-                    shared = ", ".join(shared_users) if shared_users else "No one"
-
-                    ui.label(
-                        f"Task: {task.name} | Owner: {task.owner} | Shared with: {shared}"
-                    )
-
-    def refresh_invites(self) -> None:
-        self.invite_list.clear()
-        selected_user = self.invite_user_input.value.strip()
-
-        with self.invite_list:
-            if not selected_user:
-                ui.label("Enter a username to view invites.").classes("text-slate-500")
+            if not receiver:
+                self.status_label.text = "Receiver user not found."
                 return
 
-            with get_db_context() as db:
-                invites = self.hub.view_invites(db, selected_user)
+            message = self.hub.send_invite_by_title(
+                db=db,
+                sender=current_user,
+                receiver=receiver,
+                task_title=task_title,
+            )
 
+            self.status_label.text = message
+
+        self.refresh_invites()
+        self.refresh_accessible_tasks()
+
+    def refresh_invites(self):
+        if not self.invites_container:
+            return
+
+        self.invites_container.clear()
+
+        with get_db_context() as db:
+            current_user = get_current_user_from_state(db)
+
+            if not current_user:
+                with self.invites_container:
+                    ui.label("Log in to view invites.")
+                return
+
+            invites = self.hub.view_invites(db, current_user)
+
+            with self.invites_container:
                 if not invites:
-                    ui.label(f"No pending invites for {selected_user}.")
+                    ui.label("No pending invites.")
                     return
 
                 for invite in invites:
-                    task = db.get(Task, invite.task_id)
-                    task_name = task.name if task else "Unknown task"
+                    task = db.get(Item, invite.task_id)
+                    task_title = task.title if task else "Unknown task"
 
-                    with ui.row().classes("items-center gap-2 flex-wrap"):
+                    with ui.row().classes("items-center gap-2"):
                         ui.label(
-                            f"{invite.sender} → {invite.receiver} · '{task_name}'"
+                            f"Task: {task_title} | From: {invite.sender}"
                         )
 
                         ui.button(
                             "Accept",
-                            on_click=lambda invite_id=invite.id: self.accept_invite_gui(invite_id),
-                        ).props("dense color=primary")
+                            on_click=lambda invite_id=invite.id: self.accept_invite(invite_id),
+                        ).classes("bg-green-600 text-white")
 
                         ui.button(
                             "Decline",
-                            on_click=lambda invite_id=invite.id: self.decline_invite_gui(invite_id),
-                        ).props("dense outline")
+                            on_click=lambda invite_id=invite.id: self.decline_invite(invite_id),
+                        ).classes("bg-red-600 text-white")
 
-    def create_task(self) -> None:
-        owner = self.owner_input.value.strip()
-        task_name = self.task_input.value.strip()
-
-        if not owner or not task_name:
-            self.result_label.text = "Please enter both owner and task name."
-            return
-
+    def accept_invite(self, invite_id: int):
         with get_db_context() as db:
-            existing_task = db.exec(
-                select(Task).where(Task.name == task_name)
-            ).first()
+            current_user = get_current_user_from_state(db)
 
-            if existing_task:
-                self.result_label.text = "A task with that name already exists."
+            if not current_user:
+                self.status_label.text = "You must be logged in."
                 return
 
-            task_row = Task(
-                name=task_name,
-                owner=owner,
+            message = self.hub.accept_invite(
+                db=db,
+                invite_id=invite_id,
+                user=current_user,
             )
 
-            db.add(task_row)
-            db.commit()
-            db.refresh(task_row)
+            self.status_label.text = message
 
-        self.result_label.text = f"Task '{task_name}' created for {owner}."
-        self.refresh_tasks()
+        self.refresh_invites()
+        self.refresh_accessible_tasks()
 
-    def send_invite_gui(self) -> None:
-        sender = self.sender_input.value.strip()
-        receiver = self.receiver_input.value.strip()
-        task_name = self.invite_task_input.value.strip()
-
-        if not sender or not receiver or not task_name:
-            self.result_label.text = "Please fill in sender, receiver, and task name."
-            return
-
+    def decline_invite(self, invite_id: int):
         with get_db_context() as db:
-            task_row = db.exec(
-                select(Task).where(Task.name == task_name)
-            ).first()
+            current_user = get_current_user_from_state(db)
 
-            if not task_row:
-                self.result_label.text = "Task not found."
+            if not current_user:
+                self.status_label.text = "You must be logged in."
                 return
 
-            task = CollaborationTask(
-                name=task_row.name,
-                owner=task_row.owner
+            message = self.hub.decline_invite(
+                db=db,
+                invite_id=invite_id,
+                user=current_user,
             )
 
-            self.result_label.text = self.hub.send_invite(db, sender, receiver, task)
+            self.status_label.text = message
 
         self.refresh_invites()
+        self.refresh_accessible_tasks()
 
-    def accept_invite_gui(self, invite_id: int) -> None:
+    def refresh_accessible_tasks(self):
+        if not self.shared_tasks_container:
+            return
+
+        self.shared_tasks_container.clear()
+
         with get_db_context() as db:
-            self.result_label.text = self.hub.accept_invite(db, invite_id)
+            current_user = get_current_user_from_state(db)
 
-        self.refresh_tasks()
-        self.refresh_invites()
+            if not current_user:
+                with self.shared_tasks_container:
+                    ui.label("Log in to view shared tasks.")
+                return
+
+            tasks = self.hub.get_accessible_tasks(db, current_user)
+
+            with self.shared_tasks_container:
+                if not tasks:
+                    ui.label("No owned or shared tasks yet.")
+                    return
+
+                for task in tasks:
+                    owner_label = (
+                        "Owned by you"
+                        if task.owner_id == current_user.id
+                        else f"Shared task from owner ID {task.owner_id}"
+                    )
+
+                    completed_label = "Completed" if task.completed else "Open"
+
+                    ui.label(
+                        f"{task.title} | {owner_label} | {completed_label}"
+                    )
 
 
-    def decline_invite_gui(self, invite_id: int) -> None:
-        with get_db_context() as db:
-            self.result_label.text = self.hub.decline_invite(db, invite_id)
-
-        self.refresh_invites()
-
-
-@ui.page("/collaboration")
-def collaboration_page() -> None:
-    if not guard_authenticated():
-        return
-    with dashboard_frame(title="Collaboration"):
-        CollaborationDesk().build()
+def collaboration_page():
+    page = CollaborationPage()
+    page.render()

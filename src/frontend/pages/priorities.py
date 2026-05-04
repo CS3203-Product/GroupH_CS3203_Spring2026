@@ -28,11 +28,8 @@ async def load_priority_tasks(container: ui.column):
     try:
         with get_db_context() as db:
             current_user = get_current_user_from_state(db)
-            # Load stats before items: get_user_stats may commit(), which expires
-            # all instances in the session; items must be queried after that commit
-            # so they are not expired when used outside this block.
-            user_stats = get_user_stats(db, current_user.id)
             items = item_repo.get_for_user(db=db, current_user=current_user)
+            user_stats = get_user_stats(db, current_user.id)
         
         container.clear()
         

@@ -1,16 +1,26 @@
-"""Dashboard — overview of tasks, analytics, and productivity stats."""
+"""Dashboard — real-time overview of tasks, analytics, DB state, and AI predictions."""
 
 from __future__ import annotations
 
 from fastapi import HTTPException
 from nicegui import ui
+from sqlmodel import select
 
+from src.ai.auto_retrain import trigger_background_retrain
+from src.ai.inference import predict_duration, predict_priority
+from src.ai.task_logger import TaskLogger
+from src.ai.user_stats_service import get_user_stats, rebuild_user_stats
+from src.db.models_ai import TaskExecutionLog
 from src.db.session import get_db_context
 from src.frontend.components import notifications
 from src.frontend.components.auth_utils import get_current_user_from_state
 from src.frontend.layouts.default import dashboard_frame, guard_authenticated
+from src.models import ItemCreate, ItemUpdate
 from src.productivity.task_analytics_dashboard import TaskAnalyticsDashboard
 from src.repositories.item import item_repo
+
+
+REFRESH_SECONDS = 3.0
 
 
 def _stat_card(icon: str, value: str, label: str, color: str) -> None:
@@ -58,9 +68,9 @@ def _build_completion_chart(completed: int, pending: int) -> None:
 def _build_category_chart(analytics: TaskAnalyticsDashboard) -> None:
     """Bar chart breaking down tasks by category."""
     cats: dict[str, dict[str, int]] = {}
-    for t in analytics._tasks.values():
-        entry = cats.setdefault(t.category, {"done": 0, "open": 0})
-        if t.is_completed:
+    for task in analytics._tasks.values():
+        entry = cats.setdefault(task.category or "general", {"done": 0, "open": 0})
+        if task.is_completed:
             entry["done"] += 1
         else:
             entry["open"] += 1
@@ -73,7 +83,13 @@ def _build_category_chart(analytics: TaskAnalyticsDashboard) -> None:
         {
             "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
             "legend": {"top": "0%", "textStyle": {"color": "#94a3b8"}},
-            "grid": {"left": "3%", "right": "4%", "top": "15%", "bottom": "3%", "containLabel": True},
+            "grid": {
+                "left": "3%",
+                "right": "4%",
+                "top": "15%",
+                "bottom": "3%",
+                "containLabel": True,
+            },
             "xAxis": {
                 "type": "category",
                 "data": categories,
@@ -103,13 +119,13 @@ def _build_category_chart(analytics: TaskAnalyticsDashboard) -> None:
 def _build_time_chart(analytics: TaskAnalyticsDashboard) -> None:
     """Horizontal bar chart of time spent per task."""
     tasks_with_time = [
-        t for t in analytics._tasks.values() if t.time_spent_minutes > 0
+        task for task in analytics._tasks.values() if task.time_spent_minutes > 0
     ]
-    tasks_with_time.sort(key=lambda t: t.time_spent_minutes, reverse=True)
+    tasks_with_time.sort(key=lambda task: task.time_spent_minutes, reverse=True)
     tasks_with_time = tasks_with_time[:10]
 
-    labels = [t.title[:24] for t in tasks_with_time] or ["(none)"]
-    values = [round(t.time_spent_minutes, 1) for t in tasks_with_time] or [0]
+    labels = [task.title[:24] for task in tasks_with_time] or ["(none)"]
+    values = [round(task.time_spent_minutes, 1) for task in tasks_with_time] or [0]
 
     ui.echart(
         {
@@ -138,253 +154,359 @@ def _build_time_chart(analytics: TaskAnalyticsDashboard) -> None:
 
 
 class DashboardView:
-    """Manages the dashboard UI and its backing analytics engine."""
+    """Manages the dashboard UI and keeps it synced with SQLModel + AI."""
 
     def __init__(self) -> None:
         self.analytics = TaskAnalyticsDashboard()
+        self._log_select: ui.select | None = None
+        self._metrics_container: ui.row | None = None
+        self._charts_container: ui.column | None = None
+        self._table_container: ui.column | None = None
+        self._refreshing = False
 
     def _sync_from_db(self) -> tuple[int, str]:
-        """Seed analytics from the user's persisted items. Returns (item_count, first_name)."""
+        """Refresh analytics from persisted items and update AI predictions."""
         try:
             with get_db_context() as db:
                 current_user = get_current_user_from_state(db)
                 items = item_repo.get_for_user(db=db, current_user=current_user)
+                user_stats = get_user_stats(db, current_user.id)
 
-            first_name = (
-                current_user.full_name.split()[0]
-                if current_user.full_name
-                else current_user.email.split("@")[0]
-            )
+                logs = db.exec(
+                    select(TaskExecutionLog).where(TaskExecutionLog.user_id == current_user.id)
+                ).all()
+                minutes_by_task_id: dict[int, float] = {}
+                for log in logs:
+                    if log.actual_duration:
+                        minutes_by_task_id[log.task_id] = (
+                            minutes_by_task_id.get(log.task_id, 0.0)
+                            + float(log.actual_duration) * 60
+                        )
 
-            for item in items:
-                task_id = f"item-{item.id}"
-                if task_id not in self.analytics._tasks:
-                    self.analytics.add_task(task_id, item.title, category="tasks")
-            return len(items), first_name
+                active_task_ids: set[str] = set()
+                for item in items:
+                    task_id = f"item-{item.id}"
+                    active_task_ids.add(task_id)
+
+                    predicted_duration = getattr(item, "predicted_duration", None)
+                    predicted_priority = getattr(item, "predicted_priority", None)
+
+                    try:
+                        predicted_duration = predict_duration(item, user_stats)
+                        predicted_priority = predict_priority(
+                            item, user_stats, predicted_duration
+                        )
+
+                        # Store the latest predictions so other pages can use them too.
+                        item.predicted_duration = predicted_duration
+                        item.predicted_priority = predicted_priority
+                        db.add(item)
+                    except Exception:
+                        # The dashboard should still render even if models are missing.
+                        pass
+
+                    self.analytics.upsert_task(
+                        task_id=task_id,
+                        db_id=item.id,
+                        title=item.title,
+                        category=getattr(item, "category", "general") or "general",
+                        user_id=item.owner_id,
+                        difficulty=getattr(item, "difficulty", 5),
+                        user_importance=getattr(item, "user_importance", 5),
+                        estimated_duration=getattr(item, "estimated_duration", 1.0),
+                        deadline=getattr(item, "deadline", None),
+                        is_completed=bool(item.completed),
+                        predicted_duration=predicted_duration,
+                        predicted_priority=predicted_priority,
+                        time_spent_minutes=minutes_by_task_id.get(item.id, 0.0),
+                    )
+
+                self.analytics.remove_missing(active_task_ids)
+                db.commit()
+
+                first_name = (
+                    current_user.full_name.split()[0]
+                    if current_user.full_name
+                    else current_user.email.split("@")[0]
+                )
+                return len(items), first_name
         except HTTPException as e:
             notifications.show_error(e.detail)
             return 0, ""
         except Exception as e:
-            notifications.show_error(f"Could not load items: {e}")
+            notifications.show_error(f"Could not sync dashboard: {e}")
             return 0, ""
 
     def build(self) -> None:
-        item_count, first_name = self._sync_from_db()
+        """Build dashboard shell once, then refresh data in-place."""
+        self._sync_from_db()
+
+        self._metrics_container = ui.row().classes("w-full flex-wrap gap-4")
+        self._charts_container = ui.column().classes("w-full")
+        self._build_tracker_panel()
+
+        self.refresh()
+        ui.timer(REFRESH_SECONDS, self.refresh)
+
+    def refresh(self) -> None:
+        """Refresh dashboard data without navigating or rebuilding the whole page."""
+        if self._refreshing:
+            return
+
+        self._refreshing = True
+        try:
+            self._sync_from_db()
+            self._refresh_metrics()
+            self._refresh_charts()
+            self._refresh_task_table()
+            self._refresh_select()
+        finally:
+            self._refreshing = False
+
+    def _refresh_metrics(self) -> None:
+        if not self._metrics_container:
+            return
 
         total = self.analytics.total_tasks
         completed = self.analytics.completed_tasks
         pending = total - completed
-        rate = self.analytics.completion_rate
         time_spent = self.analytics.total_time_spent
 
-        with ui.row().classes(
-            "w-full flex-wrap gap-4"
-        ):
+        self._metrics_container.clear()
+        with self._metrics_container:
             _stat_card("assignment", str(total), "Total tasks", "emerald-500")
             _stat_card("check_circle", str(completed), "Completed", "green-500")
             _stat_card("pending", str(pending), "In progress", "amber-500")
             _stat_card("schedule", f"{time_spent:.0f}m", "Time logged", "sky-500")
 
-        with ui.row().classes("w-full gap-4 flex-wrap items-start mt-2"):
-            with ui.card().classes("flex-1 min-w-[320px] p-5"):
-                ui.label("Completion overview").classes(
+    def _refresh_charts(self) -> None:
+        if not self._charts_container:
+            return
+
+        total = self.analytics.total_tasks
+        completed = self.analytics.completed_tasks
+        pending = total - completed
+        time_spent = self.analytics.total_time_spent
+
+        self._charts_container.clear()
+        with self._charts_container:
+            with ui.row().classes("w-full gap-4 flex-wrap items-start mt-2"):
+                with ui.card().classes("flex-1 min-w-[320px] p-5"):
+                    ui.label("Completion overview").classes(
+                        "text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2"
+                    )
+                    if total > 0:
+                        _build_completion_chart(completed, pending)
+                    else:
+                        ui.label("No tasks yet — add some below to see analytics.").classes(
+                            "text-slate-500 dark:text-slate-400 py-8 text-center w-full"
+                        )
+
+                with ui.card().classes("flex-1 min-w-[320px] p-5"):
+                    ui.label("Tasks by category").classes(
+                        "text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2"
+                    )
+                    if total > 0:
+                        _build_category_chart(self.analytics)
+                    else:
+                        ui.label("Categories appear once tasks are tracked.").classes(
+                            "text-slate-500 dark:text-slate-400 py-8 text-center w-full"
+                        )
+
+            with ui.card().classes("w-full p-5 mt-2"):
+                ui.label("Time spent from completed AI logs").classes(
                     "text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2"
                 )
-                if total > 0:
-                    _build_completion_chart(completed, pending)
+                if time_spent > 0:
+                    _build_time_chart(self.analytics)
                 else:
-                    ui.label("No tasks yet — add some below to see analytics.").classes(
-                        "text-slate-500 dark:text-slate-400 py-8 text-center w-full"
+                    ui.label("Complete tasks to populate this chart from AI logs.").classes(
+                        "text-slate-500 dark:text-slate-400 py-4 text-center w-full"
                     )
-
-            with ui.card().classes("flex-1 min-w-[320px] p-5"):
-                ui.label("Tasks by category").classes(
-                    "text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2"
-                )
-                if total > 0:
-                    _build_category_chart(self.analytics)
-                else:
-                    ui.label("Categories appear once tasks are tracked.").classes(
-                        "text-slate-500 dark:text-slate-400 py-8 text-center w-full"
-                    )
-
-        with ui.card().classes("w-full p-5 mt-2"):
-            ui.label("Time spent (top 10)").classes(
-                "text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2"
-            )
-            if time_spent > 0:
-                _build_time_chart(self.analytics)
-            else:
-                ui.label("Log time against tasks to populate this chart.").classes(
-                    "text-slate-500 dark:text-slate-400 py-4 text-center w-full"
-                )
-
-        self._build_tracker_panel()
 
     def _build_tracker_panel(self) -> None:
-        """Quick-add panel for tracking tasks, completion, and time."""
+        """Quick-add panel for DB-backed task creation, completion, and refresh."""
         ui.label("Quick tracker").classes(
             "text-h6 font-bold text-emerald-700 dark:text-emerald-300 mt-6 mb-2"
         )
-
-        task_table_container = ui.column().classes("w-full")
 
         with ui.card().classes("w-full p-5"):
             with ui.row().classes("w-full gap-3 flex-wrap items-end"):
                 title_in = ui.input("Task title").classes("flex-1 min-w-[160px]")
                 cat_in = ui.select(
-                    ["general", "work", "study", "health", "personal"],
+                    ["general", "work", "study", "health", "personal", "programming", "reading"],
                     value="general",
                     label="Category",
                 ).classes("min-w-[140px]")
+                difficulty_in = ui.number("Difficulty", value=5, min=1, max=10, step=1).classes("w-32")
+                importance_in = ui.number("Importance", value=5, min=1, max=10, step=1).classes("w-32")
+                duration_in = ui.number("Est. hours", value=1.0, min=0.25, step=0.25).classes("w-32")
                 ui.button(
                     "Add task",
                     icon="add",
-                    on_click=lambda: self._add_task(title_in, cat_in, task_table_container),
+                    on_click=lambda: self._add_task(
+                        title_in,
+                        cat_in,
+                        difficulty_in,
+                        importance_in,
+                        duration_in,
+                    ),
                 ).props("color=primary")
+                ui.button("Refresh", icon="refresh", on_click=self.refresh).props("outline")
 
             ui.separator().classes("my-3")
 
             with ui.row().classes("w-full gap-3 flex-wrap items-end"):
-                log_select = ui.select(
-                    options={},
-                    label="Select task",
-                ).classes("flex-1 min-w-[200px]")
-                minutes_in = ui.number("Minutes", value=25, min=1, step=5).classes(
-                    "w-28"
+                self._log_select = ui.select(options={}, label="Select open task").classes(
+                    "flex-1 min-w-[200px]"
                 )
-                ui.button(
-                    "Log time",
-                    icon="timer",
-                    on_click=lambda: self._log_time(log_select, minutes_in, task_table_container),
-                ).props("outline")
                 ui.button(
                     "Mark done",
                     icon="check",
-                    on_click=lambda: self._mark_done(log_select, task_table_container),
+                    on_click=lambda: self._mark_done(self._log_select),
                 ).props("outline color=positive")
 
-        self._log_select = log_select
-        self._refresh_task_table(task_table_container)
-        self._refresh_select()
+        self._table_container = ui.column().classes("w-full")
 
     def _refresh_select(self) -> None:
+        if not self._log_select:
+            return
+
         opts = {
-            tid: f"{t.title} ({t.category})"
-            for tid, t in self.analytics._tasks.items()
-            if not t.is_completed
+            task_id: f"{task.title} ({task.category})"
+            for task_id, task in self.analytics._tasks.items()
+            if not task.is_completed
         }
+        previous_value = self._log_select.value
         self._log_select.options = opts
+        self._log_select.value = previous_value if previous_value in opts else None
         self._log_select.update()
 
-    def _refresh_task_table(self, container: ui.column) -> None:
-        container.clear()
-        tasks = list(self.analytics._tasks.values())
+    def _refresh_task_table(self) -> None:
+        if not self._table_container:
+            return
+
+        self._table_container.clear()
+        tasks = sorted(
+            self.analytics._tasks.values(),
+            key=lambda task: (task.is_completed, task.title.lower()),
+        )
         if not tasks:
-            with container:
+            with self._table_container:
                 ui.label("No tracked tasks.").classes("text-slate-500 dark:text-slate-400 mt-2")
             return
 
         rows = [
             {
-                "title": t.title,
-                "category": t.category,
-                "status": "Done" if t.is_completed else "Open",
-                "time": f"{t.time_spent_minutes:.0f}m",
+                "title": task.title,
+                "category": task.category,
+                "status": "Done" if task.is_completed else "Open",
+                "time": f"{task.time_spent_minutes:.0f}m",
+                "duration": (
+                    f"{task.predicted_duration:.1f}h"
+                    if task.predicted_duration is not None
+                    else "—"
+                ),
+                "priority": (
+                    f"{task.predicted_priority:.1f}"
+                    if task.predicted_priority is not None
+                    else "—"
+                ),
             }
-            for t in tasks
+            for task in tasks
         ]
         columns = [
             {"name": "title", "label": "Title", "field": "title", "align": "left", "sortable": True},
             {"name": "category", "label": "Category", "field": "category", "align": "left", "sortable": True},
             {"name": "status", "label": "Status", "field": "status", "align": "center", "sortable": True},
-            {"name": "time", "label": "Time", "field": "time", "align": "right", "sortable": True},
+            {"name": "duration", "label": "AI duration", "field": "duration", "align": "right", "sortable": True},
+            {"name": "priority", "label": "AI priority", "field": "priority", "align": "right", "sortable": True},
+            {"name": "time", "label": "Logged time", "field": "time", "align": "right", "sortable": True},
         ]
-        with container:
+        with self._table_container:
             ui.table(columns=columns, rows=rows, row_key="title").classes(
                 "w-full mt-3"
             ).props("dense flat bordered")
-
-    def _get_current_user_id(self) -> int | None:
-        try:
-            with get_db_context() as db:
-                current_user = get_current_user_from_state(db)
-            return current_user.id
-        except HTTPException as e:
-            notifications.show_error(e.detail)
-        except Exception as e:
-            notifications.show_error(f"Could not resolve user: {e}")
-        return None
 
     def _add_task(
         self,
         title_in: ui.input,
         cat_in: ui.select,
-        table_container: ui.column,
+        difficulty_in: ui.number,
+        importance_in: ui.number,
+        duration_in: ui.number,
     ) -> None:
         title = (title_in.value or "").strip()
         if not title:
             notifications.show_error("Please enter a task title.")
             return
 
-        user_id = self._get_current_user_id()
-        if user_id is None:
+        try:
+            with get_db_context() as db:
+                current_user = get_current_user_from_state(db)
+                item_in = ItemCreate(
+                    title=title,
+                    description="",
+                    category=cat_in.value or "general",
+                    difficulty=int(difficulty_in.value or 5),
+                    user_importance=int(importance_in.value or 5),
+                    estimated_duration=float(duration_in.value or 1.0),
+                )
+                item_repo.create_for_user(db=db, obj_in=item_in, current_user=current_user)
+        except HTTPException as e:
+            notifications.show_error(e.detail)
+            return
+        except Exception as e:
+            notifications.show_error(f"Could not create task: {e}")
             return
 
-        task_id = f"manual-{len(self.analytics._tasks) + 1}-{title[:12]}"
-        try:
-            self.analytics.add_task(
-                task_id,
-                title,
-                category=cat_in.value,
-                user_id=user_id,
-            )
-        except KeyError:
-            notifications.show_error("A task with that ID already exists.")
-            return
         title_in.value = ""
         notifications.show_success(f"Task '{title}' added.")
-        self._refresh_task_table(table_container)
-        self._refresh_select()
-        ui.navigate.to("/dashboard")
+        trigger_background_retrain()
+        self.refresh()
 
-    def _log_time(
-        self,
-        select: ui.select,
-        minutes_in: ui.number,
-        table_container: ui.column,
-    ) -> None:
-        task_id = select.value
-        if not task_id:
+    def _mark_done(self, select: ui.select | None) -> None:
+        if not select or not select.value:
             notifications.show_error("Select a task first.")
             return
-        try:
-            self.analytics.log_time(task_id, float(minutes_in.value or 0))
-        except (KeyError, ValueError) as e:
-            notifications.show_error(str(e))
-            return
-        notifications.show_success("Time logged.")
-        self._refresh_task_table(table_container)
-        ui.navigate.to("/dashboard")
 
-    def _mark_done(
-        self,
-        select: ui.select,
-        table_container: ui.column,
-    ) -> None:
-        task_id = select.value
-        if not task_id:
-            notifications.show_error("Select a task first.")
-            return
         try:
-            self.analytics.complete_task(task_id)
+            record = self.analytics.get_task(select.value)
+            with get_db_context() as db:
+                current_user = get_current_user_from_state(db)
+                item = item_repo.get_with_permission(
+                    db=db,
+                    id=record.id,
+                    current_user=current_user,
+                )
+
+                if not item.completed:
+                    item = item_repo.update_for_user(
+                        db=db,
+                        item_id=record.id,
+                        obj_in=ItemUpdate(completed=True),
+                        current_user=current_user,
+                    )
+
+                logger = TaskLogger(db)
+                logger.log_task_started(item)
+                logger.log_task_completed(item)
+                rebuild_user_stats(db, item.owner_id)
+
+            self.analytics.complete_task(select.value)
         except KeyError as e:
             notifications.show_error(str(e))
             return
-        notifications.show_success("Task marked as complete!")
-        self._refresh_task_table(table_container)
-        self._refresh_select()
-        ui.navigate.to("/dashboard")
+        except HTTPException as e:
+            notifications.show_error(e.detail)
+            return
+        except Exception as e:
+            notifications.show_error(f"Could not complete task: {e}")
+            return
+
+        notifications.show_success("Task marked as complete and synced with AI.")
+        trigger_background_retrain()
+        self.refresh()
 
 
 def _get_first_name() -> str:
@@ -392,9 +514,9 @@ def _get_first_name() -> str:
     try:
         with get_db_context() as db:
             user = get_current_user_from_state(db)
-        if user.full_name:
-            return user.full_name.split()[0]
-        return user.email.split("@")[0]
+            if user.full_name:
+                return user.full_name.split()[0]
+            return user.email.split("@")[0]
     except Exception:
         return ""
 
@@ -409,7 +531,7 @@ def dashboard_page() -> None:
             ui.label(f"Welcome back, {first_name}").classes(
                 "text-h5 font-bold text-emerald-700 dark:text-emerald-300"
             )
-        ui.label("Your productivity at a glance.").classes(
+        ui.label("Your productivity at a glance. Auto-refreshes from PostgreSQL and AI predictions.").classes(
             "text-body2 text-slate-600 dark:text-slate-300 max-w-3xl mb-4"
         )
         DashboardView().build()

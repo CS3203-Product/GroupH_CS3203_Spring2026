@@ -1,47 +1,77 @@
-"""Collaboration invites and shared task access (logic only, no UI)."""
+"""Collaboration invites and shared task access logic.
 
-from src.productivity.collaboration_models import CollaborationTask, CollaborationInvite
+This version uses the real SQLModel task table: Item.
+The old Task model used fields like name and owner.
+The current Item model uses title and owner_id.
+"""
+
 from sqlmodel import Session, select
-from src.db.session import get_db_context
-from src.models.models import Task
+
+from src.models.models import Item, User
+from src.productivity.collaboration_models import CollaborationInvite
 
 
 class CollaborationHub:
     def __init__(self):
         self.invites: list[dict] = []
 
-    def send_invite(self, db: Session, sender: str, receiver: str, task: CollaborationTask) -> str:
-        if task.owner != sender:
+    # =========================================================
+    # SEND INVITE
+    # =========================================================
+
+    def send_invite(
+        self,
+        db: Session,
+        sender: User,
+        receiver: User,
+        item: Item,
+    ) -> str:
+        """
+        Send a collaboration invite for an Item.
+
+        sender:
+            The currently logged-in user sending the invite.
+
+        receiver:
+            The user receiving the invite.
+
+        item:
+            The task/item being shared.
+        """
+
+        if item.owner_id != sender.id:
             return "Only the owner can invite others."
 
-        if receiver in task.shared_with:
-            return f"{receiver} already has access to this task."
-
-        task_row = db.exec(
-            select(Task).where(Task.name == task.name)
-        ).first()
-
-        if not task_row:
-            return "Task not found."
-
-        task_id = task_row.id
+        if sender.id == receiver.id:
+            return "You cannot invite yourself."
 
         existing_invite = db.exec(
             select(CollaborationInvite).where(
-                CollaborationInvite.sender == sender,
-                CollaborationInvite.receiver == receiver,
-                CollaborationInvite.task_id == task_id,
+                CollaborationInvite.sender == sender.email,
+                CollaborationInvite.receiver == receiver.email,
+                CollaborationInvite.task_id == item.id,
                 CollaborationInvite.status == "pending",
             )
         ).first()
 
         if existing_invite:
-            return f"Invite already pending for {receiver}."
+            return f"Invite already pending for {receiver.email}."
+
+        already_accepted = db.exec(
+            select(CollaborationInvite).where(
+                CollaborationInvite.receiver == receiver.email,
+                CollaborationInvite.task_id == item.id,
+                CollaborationInvite.status == "accepted",
+            )
+        ).first()
+
+        if already_accepted:
+            return f"{receiver.email} already has access to this task."
 
         invite = CollaborationInvite(
-            sender=sender,
-            receiver=receiver,
-            task_id=task_id,
+            sender=sender.email,
+            receiver=receiver.email,
+            task_id=item.id,
             status="pending",
         )
 
@@ -49,21 +79,79 @@ class CollaborationHub:
         db.commit()
         db.refresh(invite)
 
-        return f"Invite sent from {sender} to {receiver} for task '{task.name}'."
-
-    def view_invites(self, db: Session, user: str):
-        statement = select(CollaborationInvite).where(
-            CollaborationInvite.receiver == user,
-            CollaborationInvite.status == "pending"
+        return (
+            f"Invite sent from {sender.email} to {receiver.email} "
+            f"for task '{item.title}'."
         )
-        results = db.exec(statement).all()
-        return results
 
-    def accept_invite(self, db: Session, invite_id: int) -> str:
+    # =========================================================
+    # SEND INVITE BY TASK TITLE
+    # =========================================================
+
+    def send_invite_by_title(
+        self,
+        db: Session,
+        sender: User,
+        receiver: User,
+        task_title: str,
+    ) -> str:
+        """
+        Convenience method for sending an invite by task title.
+
+        This is useful for UI code where the user types/selects a task title.
+        """
+
+        item = db.exec(
+            select(Item).where(
+                Item.title == task_title,
+                Item.owner_id == sender.id,
+            )
+        ).first()
+
+        if not item:
+            return "Task not found or you do not own this task."
+
+        return self.send_invite(
+            db=db,
+            sender=sender,
+            receiver=receiver,
+            item=item,
+        )
+
+    # =========================================================
+    # VIEW INVITES
+    # =========================================================
+
+    def view_invites(self, db: Session, user: User):
+        """
+        Return all pending invites for the given user.
+        """
+
+        statement = select(CollaborationInvite).where(
+            CollaborationInvite.receiver == user.email,
+            CollaborationInvite.status == "pending",
+        )
+
+        return db.exec(statement).all()
+
+    # =========================================================
+    # ACCEPT INVITE
+    # =========================================================
+
+    def accept_invite(self, db: Session, invite_id: int, user: User) -> str:
+        """
+        Accept a pending invite.
+
+        The user must be the receiver of the invite.
+        """
+
         invite = db.get(CollaborationInvite, invite_id)
 
         if not invite:
             return "Invite not found."
+
+        if invite.receiver != user.email:
+            return "You cannot accept an invite that was not sent to you."
 
         if invite.status != "pending":
             return "Invite is not pending."
@@ -76,11 +164,24 @@ class CollaborationHub:
 
         return f"{invite.receiver} accepted invite from {invite.sender}."
 
-    def decline_invite(self, db: Session, invite_id: int) -> str:
+    # =========================================================
+    # DECLINE INVITE
+    # =========================================================
+
+    def decline_invite(self, db: Session, invite_id: int, user: User) -> str:
+        """
+        Decline a pending invite.
+
+        The user must be the receiver of the invite.
+        """
+
         invite = db.get(CollaborationInvite, invite_id)
 
         if not invite:
             return "Invite not found."
+
+        if invite.receiver != user.email:
+            return "You cannot decline an invite that was not sent to you."
 
         if invite.status != "pending":
             return "Invite is not pending."
@@ -93,16 +194,78 @@ class CollaborationHub:
 
         return f"{invite.receiver} declined invite from {invite.sender}."
 
-    def can_view_task(self, db: Session, user: str, task: Task) -> bool:
-        if user == task.owner:
+    # =========================================================
+    # CAN VIEW TASK
+    # =========================================================
+
+    def can_view_task(self, db: Session, user: User, item: Item) -> bool:
+        """
+        A user can view an Item if:
+        1. They own it.
+        2. They have an accepted collaboration invite.
+        """
+
+        if item.owner_id == user.id:
             return True
 
         accepted_invite = db.exec(
             select(CollaborationInvite).where(
-                CollaborationInvite.receiver == user,
-                CollaborationInvite.task_id == task.id,
+                CollaborationInvite.receiver == user.email,
+                CollaborationInvite.task_id == item.id,
                 CollaborationInvite.status == "accepted",
             )
         ).first()
 
         return accepted_invite is not None
+
+    # =========================================================
+    # GET SHARED TASKS
+    # =========================================================
+
+    def get_shared_tasks(self, db: Session, user: User) -> list[Item]:
+        """
+        Return all Items shared with the given user through accepted invites.
+        """
+
+        accepted_invites = db.exec(
+            select(CollaborationInvite).where(
+                CollaborationInvite.receiver == user.email,
+                CollaborationInvite.status == "accepted",
+            )
+        ).all()
+
+        task_ids = [invite.task_id for invite in accepted_invites]
+
+        if not task_ids:
+            return []
+
+        shared_items = db.exec(
+            select(Item).where(Item.id.in_(task_ids))
+        ).all()
+
+        return shared_items
+
+    # =========================================================
+    # GET OWNED AND SHARED TASKS
+    # =========================================================
+
+    def get_accessible_tasks(self, db: Session, user: User) -> list[Item]:
+        """
+        Return tasks the user owns plus tasks shared with them.
+        """
+
+        owned_items = db.exec(
+            select(Item).where(Item.owner_id == user.id)
+        ).all()
+
+        shared_items = self.get_shared_tasks(db, user)
+
+        combined: dict[int, Item] = {}
+
+        for item in owned_items:
+            combined[item.id] = item
+
+        for item in shared_items:
+            combined[item.id] = item
+
+        return list(combined.values())

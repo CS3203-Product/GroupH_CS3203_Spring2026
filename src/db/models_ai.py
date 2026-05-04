@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlmodel import SQLModel, Field
+from src.core.config import settings
 
 
 # =========================================================
@@ -11,6 +12,7 @@ from sqlmodel import SQLModel, Field
 class TaskExecutionLog(SQLModel, table=True):
 
     __tablename__ = "task_execution_logs"
+    __table_args__ = {"schema": settings.SCHEMA_NAME}
 
     id: Optional[int] = Field(
         default=None,
@@ -21,9 +23,13 @@ class TaskExecutionLog(SQLModel, table=True):
     # IDENTIFIERS
     # =====================================
 
-    user_id: int
+    user_id: int = Field(
+    foreign_key=f"{settings.SCHEMA_NAME}.user.id"
+    )
 
-    task_id: int
+    task_id: int = Field(
+    foreign_key=f"{settings.SCHEMA_NAME}.item.id"
+    )
 
     # =====================================
     # TASK METADATA
@@ -99,7 +105,7 @@ class TaskExecutionLog(SQLModel, table=True):
 class UserBehaviorStats(SQLModel, table=True):
 
     __tablename__ = "user_behavior_stats"
-
+    __table_args__ = {"schema": settings.SCHEMA_NAME}
     id: Optional[int] = Field(
         default=None,
         primary_key=True

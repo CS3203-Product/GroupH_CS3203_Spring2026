@@ -3,6 +3,7 @@ from nicegui import ui
 from src.models import ItemCreate, ItemUpdate
 from src.repositories.item import item_repo
 from src.db.session import get_db_context
+from src.ai.task_logger import TaskLogger
 from src.frontend.components import notifications
 from src.frontend.components.auth_utils import get_current_user_from_state
 from src.frontend.layouts.default import dashboard_frame, guard_authenticated
@@ -48,8 +49,8 @@ async def load_items(grid: ui.grid):
     try:
         with get_db_context() as db:
             current_user = get_current_user_from_state(db)
-            user_stats = get_user_stats(db, current_user.id)
             items = item_repo.get_for_user(db=db, current_user=current_user)
+            user_stats = get_user_stats(db, current_user.id)
 
         grid.clear()
         with grid:
@@ -107,9 +108,7 @@ async def load_items(grid: ui.grid):
 
                             ui.button(
                                 icon="task_alt",
-                                on_click=lambda item=item: ui.run_async(
-                                    complete_item(item, grid)
-                                ),
+                                on_click=lambda item=item: complete_item(item, grid),
                             ).props("flat dense color=green")
 
                             # Delete Button - opens a confirmation dialog
@@ -148,18 +147,18 @@ async def complete_item(
     try:
         with get_db_context() as db:
             current_user = get_current_user_from_state(db)
-            item_repo.update_for_user(
+            updated_item = item_repo.update_for_user(
                 db=db,
                 item_id=item.id,
                 obj_in=ItemUpdate(completed=True),
                 current_user=current_user,
             )
+            logger = TaskLogger(db)
+            logger.log_task_started(updated_item)
+            logger.log_task_completed(updated_item)
+            rebuild_user_stats(db, updated_item.owner_id)
 
-            task_logger.log_task_started(item)
-            task_logger.log_task_completed(item)
-            rebuild_user_stats(db, item.owner_id)
-
-        behavior_tracker.build_behavior_profile(item.owner_id)
+        behavior_tracker.build_behavior_profile(updated_item.owner_id)
         trigger_background_retrain()
 
         notifications.show_success(f"Task '{item.title}' logged as completed.")

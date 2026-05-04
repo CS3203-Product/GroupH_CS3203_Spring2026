@@ -1,17 +1,14 @@
-"""Task analytics and completion tracking."""
+"""Task analytics and completion tracking.
+
+This module intentionally stays UI/database independent. The NiceGUI dashboard
+page is responsible for syncing these in-memory records with SQLModel.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
-
-from src.ai.auto_retrain import trigger_background_retrain
-from src.ai.services import (
-    behavior_tracker,
-    task_logger
-)
-from src.ai.user_stats_service import rebuild_user_stats
 
 
 @dataclass
@@ -26,6 +23,8 @@ class TaskRecord:
     difficulty: int = 5
     user_importance: int = 5
     estimated_duration: float = 1.0
+    predicted_duration: Optional[float] = None
+    predicted_priority: Optional[float] = None
     is_completed: bool = False
     started: bool = False
     time_spent_minutes: float = 0.0
@@ -69,6 +68,56 @@ class TaskAnalyticsDashboard:
         self._tasks[task_id] = record
         return record
 
+    def upsert_task(
+        self,
+        *,
+        task_id: str,
+        db_id: int,
+        title: str,
+        category: str = "general",
+        user_id: Optional[int] = None,
+        difficulty: int = 5,
+        user_importance: int = 5,
+        estimated_duration: float = 1.0,
+        deadline: Optional[datetime] = None,
+        is_completed: bool = False,
+        predicted_duration: Optional[float] = None,
+        predicted_priority: Optional[float] = None,
+        time_spent_minutes: float = 0.0,
+    ) -> TaskRecord:
+        if task_id in self._tasks:
+            record = self._tasks[task_id]
+        else:
+            record = self.add_task(
+                task_id=task_id,
+                title=title,
+                category=category,
+                user_id=user_id,
+                difficulty=difficulty,
+                user_importance=user_importance,
+                estimated_duration=estimated_duration,
+                deadline=deadline,
+            )
+
+        record.id = db_id
+        record.title = title
+        record.category = category or "general"
+        record.user_id = user_id
+        record.difficulty = difficulty
+        record.user_importance = user_importance
+        record.estimated_duration = estimated_duration
+        record.deadline = deadline
+        record.is_completed = is_completed
+        record.predicted_duration = predicted_duration
+        record.predicted_priority = predicted_priority
+        record.time_spent_minutes = time_spent_minutes
+        return record
+
+    def remove_missing(self, active_task_ids: set[str]) -> None:
+        for task_id in list(self._tasks):
+            if task_id not in active_task_ids:
+                del self._tasks[task_id]
+
     def get_task(self, task_id: str) -> TaskRecord:
         if task_id not in self._tasks:
             raise KeyError(f"Task '{task_id}' not found")
@@ -76,15 +125,6 @@ class TaskAnalyticsDashboard:
 
     def complete_task(self, task_id: str) -> TaskRecord:
         t = self.get_task(task_id)
-        if t.user_id is not None:
-            if not t.started:
-                task_logger.log_task_started(t)
-                t.started = True
-            task_logger.log_task_completed(t)
-            rebuild_user_stats(task_logger.session, t.user_id)
-            behavior_tracker.build_behavior_profile(t.user_id)
-            trigger_background_retrain()
-
         t.is_completed = True
         return t
 
@@ -92,9 +132,7 @@ class TaskAnalyticsDashboard:
         if minutes < 0:
             raise ValueError("minutes must be non-negative")
         t = self.get_task(task_id)
-        if t.user_id is not None and not t.started:
-            task_logger.log_task_started(t)
-            t.started = True
+        t.started = True
         t.time_spent_minutes += minutes
 
     @property

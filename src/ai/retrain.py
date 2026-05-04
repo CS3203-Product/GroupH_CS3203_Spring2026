@@ -4,6 +4,7 @@ import joblib
 import pandas as pd
 
 from sklearn.ensemble import RandomForestRegressor
+from sqlmodel import select
 
 from src.ai.feature_builder import (
     build_task_features,
@@ -24,7 +25,7 @@ MODEL_DIR.mkdir(exist_ok=True)
 
 def train_duration_model(session):
 
-    logs = session.query(TaskExecutionLog).all()
+    logs = session.exec(select(TaskExecutionLog)).all()
 
     if len(logs) < 10:
         print("[AI] Not enough data to train duration model")
@@ -40,7 +41,7 @@ def train_duration_model(session):
             "user_importance": 5,
             "difficulty": 3,
             "category": "general",
-            "deadline": log.end_time,
+            "deadline": log.completed_at,
             "user_id": log.user_id
         })()
 
@@ -68,7 +69,7 @@ def train_duration_model(session):
 
 def train_priority_model(session):
 
-    logs = session.query(TaskExecutionLog).all()
+    logs = session.exec(select(TaskExecutionLog)).all()
 
     if len(logs) < 10:
         print("[AI] Not enough data to train priority model")
@@ -84,7 +85,7 @@ def train_priority_model(session):
             "user_importance": 5,
             "difficulty": 3,
             "category": "general",
-            "deadline": log.end_time,
+            "deadline": log.completed_at,
             "user_id": log.user_id
         })()
 

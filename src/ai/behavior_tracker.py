@@ -2,6 +2,7 @@ from collections import defaultdict
 from statistics import mean
 
 from src.db.models_ai import TaskExecutionLog
+from sqlmodel import select
 
 
 class BehaviorTracker:
@@ -24,12 +25,9 @@ class BehaviorTracker:
 
     def build_behavior_profile(self, user_id):
 
-        logs = (
-            self.session.query(TaskExecutionLog)
-            .filter_by(user_id=user_id)
-            .all()
-        )
-
+        logs = self.session.exec(
+            select(TaskExecutionLog).where(TaskExecutionLog.user_id == user_id)
+            ).all()
         if not logs:
             return self.default_profile()
 

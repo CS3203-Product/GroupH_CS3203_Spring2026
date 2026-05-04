@@ -1,7 +1,9 @@
 from datetime import datetime
 
 from src.db.models_ai import TaskExecutionLog
-
+from src.ai.auto_retrain import trigger_background_retrain
+from src.ai.user_stats_service import rebuild_user_stats
+from sqlmodel import select
 
 class TaskLogger:
 
@@ -46,12 +48,11 @@ class TaskLogger:
 
     def log_interruption(self, task_id):
 
-        log = (
-            self.session.query(TaskExecutionLog)
-            .filter_by(task_id=task_id)
+        log = self.session.exec(
+            select(TaskExecutionLog)
+            .where(TaskExecutionLog.task_id == task_id)
             .order_by(TaskExecutionLog.id.desc())
-            .first()
-        )
+            ).first()
 
         if log:
             log.interruptions += 1
@@ -63,12 +64,11 @@ class TaskLogger:
 
     def log_reschedule(self, task_id):
 
-        log = (
-            self.session.query(TaskExecutionLog)
-            .filter_by(task_id=task_id)
+        log = self.session.exec(
+            select(TaskExecutionLog)
+            .where(TaskExecutionLog.task_id == task_id)
             .order_by(TaskExecutionLog.id.desc())
-            .first()
-        )
+            ).first()
 
         if log:
             log.reschedule_count += 1
@@ -87,13 +87,11 @@ class TaskLogger:
         completion_quality=5
     ):
 
-        log = (
-            self.session.query(TaskExecutionLog)
-            .filter_by(task_id=task.id)
+        log = self.session.exec(
+            select(TaskExecutionLog)
+            .where(TaskExecutionLog.task_id == task.id)
             .order_by(TaskExecutionLog.id.desc())
-            .first()
-        )
-
+            ).first()
         if not log:
             return
 
@@ -101,6 +99,14 @@ class TaskLogger:
 
         log.completed_at = now
         log.was_completed = True
+        # =====================================
+        # UPDATE ACTUAL TASK
+        # =====================================
+
+        task.completed = True
+
+        self.session.add(task)
+
 
         duration = (
             now - log.started_at
@@ -122,4 +128,24 @@ class TaskLogger:
             ).total_seconds() / 3600
 
             log.delay_amount = delay
+        self.session.add(log)
+
         self.session.commit()
+
+# =====================================
+# REBUILD USER STATS
+# =====================================
+
+
+
+        rebuild_user_stats(
+            self.session,
+            task.owner_id
+        )
+
+# =====================================
+# AUTO RETRAIN
+# =====================================
+
+
+        trigger_background_retrain()
