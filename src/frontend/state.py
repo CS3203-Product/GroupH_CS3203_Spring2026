@@ -26,6 +26,7 @@ def get_auth() -> AuthState | None:
 
     token = auth.get("access_token")
 
+    # CWE-613: Insufficient Session Expiration
     try:
         jwt.decode(
             token,
