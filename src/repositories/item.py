@@ -99,7 +99,7 @@ class ItemRepository:
 
     def create(self, db: Session, *, obj_in: ItemCreate, owner_id: int) -> Item:
         """Creates a new item in the database, assigning it to a specific owner."""
-        db_obj = Item(**obj_in.dict(), owner_id=owner_id)
+        db_obj = Item(**obj_in.model_dump(), owner_id=owner_id)
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)

@@ -12,6 +12,7 @@ def schedule_page() -> None:
         return
     with dashboard_frame(title="Schedule"):
         ui.label(
-            "Plan tasks by importance and weekday. Entries update the grid instantly."
+            "Plan tasks by importance and weekday (categories match the dashboard tracker). "
+            "Reorder tasks that share the same day and importance with the arrows below the grid."
         ).classes("text-body2 text-slate-600 dark:text-slate-300 max-w-3xl mb-4")
         TimeBlockingScheduler()
