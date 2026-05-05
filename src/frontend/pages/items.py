@@ -108,8 +108,8 @@ async def load_items(grid: ui.grid):
 
                             ui.button(
                                 icon="task_alt",
-                                on_click=lambda item=item: complete_item(item, grid),
-                            ).props("flat dense color=green")
+                                on_click=lambda item_id=item.id: complete_item(item_id, grid),
+                            ).props("flat dense color=green").tooltip("Mark task complete")
 
                             # Delete Button - opens a confirmation dialog
                             with ui.dialog() as confirm_dialog, ui.card():
@@ -139,33 +139,58 @@ async def load_items(grid: ui.grid):
     except Exception as e:
         notifications.show_error(f"An unexpected error occurred: {e}")
 
-
-async def complete_item(
-    item,
-    grid: ui.grid,
-):
+async def complete_item(item_id: int, grid: ui.grid):
+    """Marks an item complete from the taskboard and syncs DB + AI."""
     try:
         with get_db_context() as db:
             current_user = get_current_user_from_state(db)
+
+            # Get a fresh Item inside the active session
+            item = item_repo.get_with_permission(
+                db=db,
+                id=item_id,
+                current_user=current_user,
+            )
+
+            if not item:
+                notifications.show_error("Task not found.")
+                return
+
+            # Mark the actual task complete
             updated_item = item_repo.update_for_user(
                 db=db,
-                item_id=item.id,
+                item_id=item_id,
                 obj_in=ItemUpdate(completed=True),
                 current_user=current_user,
             )
+
+            # Log AI task activity using the active DB session
             logger = TaskLogger(db)
+
             logger.log_task_started(updated_item)
             logger.log_task_completed(updated_item)
-            rebuild_user_stats(db, updated_item.owner_id)
 
-        behavior_tracker.build_behavior_profile(updated_item.owner_id)
+            # Rebuild user stats while still using safe values
+            owner_id = updated_item.owner_id
+            title = updated_item.title
+
+            rebuild_user_stats(db, owner_id)
+
+        # Outside the DB session, only use copied primitive values
+        behavior_tracker.build_behavior_profile(owner_id)
         trigger_background_retrain()
 
-        notifications.show_success(f"Task '{item.title}' logged as completed.")
-        await load_items(grid)
-    except Exception as e:
-        notifications.show_error(f"Could not log task completion: {e}")
+        notifications.show_success(
+            f"Task '{title}' marked as completed."
+        )
 
+        await load_items(grid)
+
+    except HTTPException as e:
+        notifications.show_error(e.detail)
+
+    except Exception as e:
+        notifications.show_error(f"Could not mark task complete: {e}")
 
 async def create_item(
     title_input: ui.input,
