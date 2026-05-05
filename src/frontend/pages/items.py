@@ -1,3 +1,5 @@
+from tkinter import dialog
+
 from fastapi import HTTPException
 from nicegui import ui
 from src.models import ItemCreate, ItemUpdate
@@ -26,21 +28,58 @@ def items_page():
             "w-full gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
         )
 
-        with ui.dialog() as dialog, ui.card().classes("min-w-[600px]"):
-            ui.label("New card").classes("text-h6")
-            title_input = ui.input("Title").classes("w-full")
-            desc_input = ui.textarea("Description").classes("w-full")
-            ui.button(
-                "Create",
-                on_click=lambda: create_item(
-                    title_input,
-                    desc_input,
-                    dialog,
-                    items_grid,
-                ),
-            ).classes("w-full")
+        with ui.dialog() as dialog, ui.card().classes("min-w-[700px]"):
+            ui.label("New task").classes("text-h6")
 
-        ui.button("Add card", on_click=dialog.open, icon="add").props("color=primary")
+            title_input = ui.input("Task title").classes("w-full")
+            desc_input = ui.textarea("Description").classes("w-full")
+
+            with ui.row().classes("w-full gap-3 flex-wrap items-end"):
+                category_input = ui.select(
+                ["general", "work", "study", "health", "personal", "programming", "reading"],
+                value="general",
+                label="Category",
+                ).classes("min-w-[160px]")
+
+                difficulty_input = ui.number(
+                    "Difficulty",
+                    value=5,
+                    min=1,
+                    max=10,
+                    step=1,
+                ).classes("w-32")
+
+                importance_input = ui.number(
+                    "Importance",
+                    value=5,
+                    min=1,
+                    max=10,
+                    step=1,
+                ).classes("w-32")
+
+                duration_input = ui.number(
+                    "Est. hours",
+                    value=1.0,
+                    min=0.25,
+                    step=0.25,
+                ).classes("w-32")
+
+            ui.button(
+                "Create task",
+                icon="add",
+                on_click=lambda: create_item(
+                title_input,
+                desc_input,
+                category_input,
+                difficulty_input,
+                importance_input,
+                duration_input,
+                dialog,
+                items_grid,
+                ),
+            ).classes("w-full").props("color=primary")
+
+        ui.button("Add task", on_click=dialog.open, icon="add").props("color=primary")
         ui.timer(0.1, lambda: load_items(items_grid), once=True)
 
 
@@ -63,7 +102,11 @@ async def load_items(grid: ui.grid):
                         ui.label(item.title).classes("text-xl font-semibold")
                         ui.separator().classes("w-full my-1")
                         ui.label(item.description).classes("text-sm line-clamp-3")
-                        
+                        with ui.row().classes("w-full gap-2 mt-2 flex-wrap"):
+                            ui.badge(item.category or "general").props("color=grey")
+                            ui.badge(f"Difficulty: {item.difficulty}").props("color=purple")
+                            ui.badge(f"Importance: {item.user_importance}").props("color=amber")
+                            ui.badge(f"Est: {item.estimated_duration:.1f}h").props("color=blue")
                         # AI Predictions
                         try:
                             pred_duration = predict_duration(item, user_stats)
@@ -195,24 +238,57 @@ async def complete_item(item_id: int, grid: ui.grid):
 async def create_item(
     title_input: ui.input,
     desc_input: ui.textarea,
+    category_input: ui.select,
+    difficulty_input: ui.number,
+    importance_input: ui.number,
+    duration_input: ui.number,
     dialog: ui.dialog,
     grid: ui.grid,
 ):
-    """Creates a new item by directly calling repository functions."""
+    """Creates a new AI-ready task from the taskboard."""
+    title = (title_input.value or "").strip()
+
+    if not title:
+        notifications.show_error("Please enter a task title.")
+        return
+
     try:
         with get_db_context() as db:
             current_user = get_current_user_from_state(db)
-            item_in = ItemCreate(title=title_input.value, description=desc_input.value)
-            item_repo.create_for_user(db=db, obj_in=item_in, current_user=current_user)
 
-        notifications.show_success("Item created successfully!")
+            item_in = ItemCreate(
+                title=title,
+                description=desc_input.value or "",
+                category=category_input.value or "general",
+                difficulty=int(difficulty_input.value or 5),
+                user_importance=int(importance_input.value or 5),
+                estimated_duration=float(duration_input.value or 1.0),
+            )
+
+            item_repo.create_for_user(
+                db=db,
+                obj_in=item_in,
+                current_user=current_user,
+            )
+
+        notifications.show_success(f"Task '{title}' created successfully.")
+
+        title_input.value = ""
+        desc_input.value = ""
+        category_input.value = "general"
+        difficulty_input.value = 5
+        importance_input.value = 5
+        duration_input.value = 1.0
+
         dialog.close()
+        trigger_background_retrain()
         await load_items(grid)
+
     except HTTPException as e:
         notifications.show_error(e.detail)
+
     except Exception as e:
         notifications.show_error(f"An unexpected error occurred: {e}")
-
 
 async def update_item(
     item_id: int,
