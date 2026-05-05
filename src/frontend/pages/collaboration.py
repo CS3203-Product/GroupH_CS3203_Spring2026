@@ -1,6 +1,6 @@
 from nicegui import ui
 from sqlmodel import select
-
+from src.frontend.layouts.default import dashboard_frame, guard_authenticated
 from src.db.session import get_db_context
 from src.models.models import Item, User
 from src.productivity.collaboration_hub import CollaborationHub
@@ -198,6 +198,11 @@ class CollaborationPage:
                     )
 
 
+@ui.page("/collaboration")
 def collaboration_page():
-    page = CollaborationPage()
-    page.render()
+    if not guard_authenticated():
+        return
+
+    with dashboard_frame(title="Collaboration"):
+        page = CollaborationPage()
+        page.render()
