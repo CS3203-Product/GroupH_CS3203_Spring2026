@@ -14,6 +14,14 @@ Or for your user account:
     python scripts/generate_fake_training_data.py --email your_email@example.com --tasks 75
 """
 
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import argparse
 import random
 from datetime import datetime, timedelta
