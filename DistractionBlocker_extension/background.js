@@ -18,7 +18,6 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   const hostname = url.hostname.replace(/^www\./, '');
 
   const token = await getAccessToken();
-  console.log('Token ->', token);
   if (!token) {
     console.warn(
       'Distraction Blocker: no session. Set API URL and sign in under extension options.',
@@ -29,7 +28,6 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   const apiBase = await getApiBaseUrl();
 
   try {
-    console.log('Hostname ->', hostname);
     const response = await fetch(`${apiBase}/blocker/check-url`, {
       method: 'POST',
       headers: {
@@ -38,8 +36,6 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
       },
       body: JSON.stringify({ url: hostname }),
     });
-
-    console.log('Res ->', response);
 
     if (response.status === 401) {
       console.warn('Distraction Blocker: session invalid; sign in again in options.');
@@ -53,8 +49,6 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     }
 
     const data = await response.json();
-
-    console.log('Data ->', data);
 
     if (data.blocked) {
       const siteParam = encodeURIComponent(hostname);
