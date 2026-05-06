@@ -99,12 +99,46 @@ def _ensure_weekly_schedule_tracker_columns() -> None:
             conn.execute(text(stmt))
 
 
+def _ensure_user_distraction_columns() -> None:
+    """Add distraction blocker schedule columns to ``user`` if missing."""
+    inspector = inspect(engine)
+    dialect = engine.dialect.name
+    schema = settings.SCHEMA_NAME
+
+    if dialect == "sqlite":
+        if not inspector.has_table("user"):
+            return
+        col_names = {c["name"] for c in inspector.get_columns("user")}
+        table_sql = "user"
+    else:
+        if not inspector.has_table("user", schema=schema):
+            return
+        col_names = {c["name"] for c in inspector.get_columns("user", schema=schema)}
+        table_sql = f'"{schema}"."user"'
+
+    alters: list[str] = []
+    if "distraction_block_start" not in col_names:
+        alters.append(
+            f"ALTER TABLE {table_sql} ADD COLUMN distraction_block_start VARCHAR(5) NOT NULL DEFAULT '10:30'"
+        )
+    if "distraction_block_end" not in col_names:
+        alters.append(
+            f"ALTER TABLE {table_sql} ADD COLUMN distraction_block_end VARCHAR(5) NOT NULL DEFAULT '20:00'"
+        )
+    if not alters:
+        return
+    with engine.begin() as conn:
+        for stmt in alters:
+            conn.execute(text(stmt))
+
+
 def init() -> None:
     """Initializes the database, creating all necessary tables
     and ensuring the first superuser account is created."""
     SQLModel.metadata.create_all(engine)
     _ensure_item_tracker_columns()
     _ensure_weekly_schedule_tracker_columns()
+    _ensure_user_distraction_columns()
 
     with Session(engine) as session:
         user = user_repo.get_by_email(db=session, email=settings.FIRST_SUPERUSER)

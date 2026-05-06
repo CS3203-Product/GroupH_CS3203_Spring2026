@@ -1,36 +1,62 @@
-chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+const DEFAULT_API_BASE = 'http://localhost:8000';
 
-// Checks the main address bar and disregards ads, embedded videos
+async function getApiBaseUrl() {
+  const { apiBaseUrl } = await chrome.storage.local.get(['apiBaseUrl']);
+  const raw = typeof apiBaseUrl === 'string' ? apiBaseUrl.trim() : '';
+  return (raw || DEFAULT_API_BASE).replace(/\/$/, '');
+}
+
+async function getAccessToken() {
+  const { accessToken } = await chrome.storage.local.get(['accessToken']);
+  return typeof accessToken === 'string' && accessToken ? accessToken : null;
+}
+
+chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return;
 
-// URL string converts to URL object for extracting domain name
   const url = new URL(details.url);
+  const hostname = url.hostname.replace(/^www\./, '');
 
-// Cleans domain: e.g.,  “://youtube.com” becomes “youtube.com”
-  const hostname = url.hostname.replace('www.', '');
+  const token = await getAccessToken();
+  if (!token) {
+    console.warn(
+      'Distraction Blocker: no session. Set API URL and sign in under extension options.',
+    );
+    return;
+  }
+
+  const apiBase = await getApiBaseUrl();
 
   try {
-
-// Send POST request to FASTAPI backend hosted on Render. The fetch sends the current domain to a remote FASTAPI endpoint to check if the site is restricted based on user focus settings. Centralizes blocking logic for the backend so the extension makes real time decisions using records from Supabase. 
-    const response = await fetch('https://grouph-cs3203-spring2026-h2lk.onrender.com/blocker/check-url', {
+    const response = await fetch(`${apiBase}/blocker/check-url`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-url: hostname, 
-user_id: '123'
- })
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ url: hostname }),
     });
+
+    if (response.status === 401) {
+      console.warn('Distraction Blocker: session invalid; sign in again in options.');
+      await chrome.storage.local.remove(['accessToken', 'userId']);
+      return;
+    }
+
+    if (!response.ok) {
+      console.error('Blocker check failed:', response.status, await response.text());
+      return;
+    }
 
     const data = await response.json();
 
-// If FASTAPI indicates site is blocked, redirect the user to “blocked.html” page 
     if (data.blocked) {
-      chrome.tabs.update(details.tabId, { url: chrome.runtime.getURL(`blocked.html?site=${hostname}`) 
-});
+      const siteParam = encodeURIComponent(hostname);
+      chrome.tabs.update(details.tabId, {
+        url: chrome.runtime.getURL(`blocked.html?site=${siteParam}`),
+      });
     }
   } catch (err) {
-
-// Log errors to extension console ( e.g., if FASTAPI server is offline)
     console.error('Blocker check failed:', err);
   }
 });

@@ -1,4 +1,6 @@
 from typing import Optional
+
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from src.core.config import settings
@@ -30,12 +32,31 @@ class User(UserBase, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     hashed_password: str
+    distraction_block_start: str = Field(default="10:30", max_length=5)
+    distraction_block_end: str = Field(default="20:00", max_length=5)
     items: list["Item"] = Relationship(back_populates="owner")
     weekly_schedule_entries: list["WeeklyScheduleEntry"] = Relationship(
         back_populates="owner"
     )
+    blocked_sites: list["BlockedSite"] = Relationship(back_populates="owner")
 
     __table_args__ = TABLE_ARGS
+
+
+class BlockedSite(SQLModel, table=True):
+    """Blocked hostnames for the browser distraction blocker (one row per user + url)."""
+
+    __tablename__ = "blocked_site"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key=f"{settings.SCHEMA_NAME}.user.id", index=True)
+    url: str = Field(max_length=2048)
+    owner: Optional["User"] = Relationship(back_populates="blocked_sites")
+
+    __table_args__ = (
+        UniqueConstraint("owner_id", "url", name="uq_blocked_site_owner_url"),
+        TABLE_ARGS,
+    )
 
 
 class UserRead(UserBase):
