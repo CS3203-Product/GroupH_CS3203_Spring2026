@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 from nicegui import app, ui
 
-from src.backend.endpoints import items, login, users
+from src.backend.endpoints import blocker, items, login, users
 from src.core.config import settings
 from src.db import init_db
 from src.frontend.theme import apply_productive_theme
@@ -18,6 +18,7 @@ from src.frontend.pages import (
     collaboration,
     create_user,
     dashboard,
+    distraction_blocker,
     focus,
     home,
     items as items_page,
@@ -50,6 +51,7 @@ app.add_middleware(
 )
 
 app.include_router(login.router, tags=["login"])
+app.include_router(blocker.router, tags=["blocker"])
 app.include_router(users.router, prefix="/api/v1", tags=["users"])
 app.include_router(items.router, prefix="/api/v1", tags=["items"])
 

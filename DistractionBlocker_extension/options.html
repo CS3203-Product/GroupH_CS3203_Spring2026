@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Distraction Blocker — Account</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 28rem;
+        margin: 1.5rem auto;
+        padding: 0 1rem;
+        color: #0f172a;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+        font-size: 0.875rem;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 0.25rem;
+        padding: 0.5rem;
+      }
+      button {
+        margin-top: 1rem;
+        margin-right: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+      }
+      #status {
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        color: #334155;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Distraction Blocker</h1>
+    <p>Point the extension at your FastAPI server and sign in with your UnCram account.</p>
+
+    <label for="apiBaseUrl">API base URL (no trailing slash)</label>
+    <input
+      id="apiBaseUrl"
+      type="url"
+      placeholder="http://localhost:8000"
+      autocomplete="off"
+    />
+
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" />
+
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" />
+
+    <div>
+      <button type="button" id="saveBase">Save API URL</button>
+      <button type="button" id="login">Sign in</button>
+      <button type="button" id="logout">Sign out</button>
+    </div>
+
+    <p id="status"></p>
+    <script src="options.js"></script>
+  </body>
+</html>

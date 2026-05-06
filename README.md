@@ -16,6 +16,7 @@ UnCram is a full-stack productivity workspace built with **NiceGUI** and **FastA
 | 🎧 **Ambient** | Streamed ambient sample + audio manager presets. |
 | 📌 **Priorities** | Quick capture UI with day buckets. |
 | 👥 **Collaboration** | Tasks, invites, accept/decline (session-scoped UI state). |
+| 🚫 **Distraction blocker** | Web UI for blocked sites + schedule; Chrome MV3 extension enforces blocking. |
 | 🔐 **API** | `/docs` Swagger for JSON endpoints (`/api/v1/...`). |
 
 ---
@@ -24,6 +25,7 @@ UnCram is a full-stack productivity workspace built with **NiceGUI** and **FastA
 
 ```text
 app.py                 # Entry: NiceGUI + FastAPI, static mounts, routers
+DistractionBlocker_extension/   # Load unpacked in Chrome/Edge (see below)
 assets/sound/          # Served at /assets/sound (e.g. alarm.mp3)
 src/
   ambient_focus/       # AudioManager, presets, Spotify/YouTube stubs
@@ -90,6 +92,44 @@ Default superuser (change in production!) is set in `.env` as `FIRST_SUPERUSER` 
 
 ---
 
+## 🚫 Distraction Blocker (browser extension)
+
+The extension checks each top-level navigation against your **blocked sites** and **blocking schedule** stored in the app database. The backend must be running and reachable from the browser.
+
+### 1 · Configure blocking in UnCram
+
+1. Sign in to the web app (same account you will use in the extension).
+2. Open **Distraction blocker** in the left drawer.
+3. Add hostnames to block (for example `youtube.com`). Paste a full URL if you like; `www.` is stripped automatically.
+4. Set **From** / **To** with **AM/PM** and click **Save schedule**. That window is when listed sites are treated as blocked (overnight ranges are supported if “from” is later than “to”).
+
+### 2 · Install the extension (Chrome or Edge)
+
+1. Open `chrome://extensions` (Chrome) or `edge://extensions` (Edge).
+2. Turn on **Developer mode**.
+3. Click **Load unpacked** and choose the folder **`DistractionBlocker_extension`** at the root of this repo (the folder that contains `manifest.json`).
+
+### 3 · Point the extension at your API and sign in
+
+1. Open the extension’s **options** page: from `chrome://extensions`, click **Details** under “Distraction Blocker”, then **Extension options** (or open the options URL Chrome shows for the extension).
+2. **API base URL**: use the origin where UnCram runs, **no trailing slash** — for local dev this is usually `http://localhost:8000`. For a deployed server, use that HTTPS origin instead.
+3. Click **Save API URL** if you changed it.
+4. Enter your **email** and **password** (same as the web app) and click **Sign in**. The extension stores a JWT and your user id in extension storage.
+
+Until you sign in, the background script will not redirect tabs.
+
+### 4 · Verify
+
+With the app running and you signed in, browse to a hostname on your blocked list **during your saved schedule**. The tab should redirect to the extension’s blocked page.
+
+**Troubleshooting**
+
+- **401 / sign-in errors**: Confirm the API URL matches the running server and credentials are correct.
+- **Nothing blocked**: Check the **Distraction blocker** page for the hostname and schedule; remember blocking only applies inside the configured time window.
+- **Production**: Serve the app over **HTTPS** and use that URL as the API base; mixed content may block `fetch` from an HTTPS page to `http://localhost`.
+
+---
+
 ## 🧪 Tests
 
 ```bash
@@ -113,7 +153,7 @@ The app uses an **emerald / slate** palette, dark mode by default, and a left **
 
 ## 🗺️ Roadmap (high level)
 
-- **Phase 1 — Focus:** timer polish, distraction blocker browser extension, richer ambient library.  
+- **Phase 1 — Focus:** timer polish, distraction blocker polish, richer ambient library.  
 - **Phase 2 — Progress:** analytics dashboards, collaboration polish, shared calendars.
 
 ---

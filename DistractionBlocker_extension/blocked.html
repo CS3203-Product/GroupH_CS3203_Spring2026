@@ -4,7 +4,12 @@
   <p id="m"></p>
   <a href="http://127.0.0.1:8080">Back to Uncram</a>
   <script>
-    const s = new URLSearchParams(location.search).get('site') || 'This site';
+    let s = new URLSearchParams(location.search).get('site') || 'This site';
+    try {
+      s = decodeURIComponent(s);
+    } catch (_) {
+      /* keep raw */
+    }
     document.getElementById('m').innerText = s + " is blocked.";
   </script>
 </body>

@@ -12,6 +12,7 @@ _NAV = [
     ("assignment", "/items", "Task board"),
     ("calendar_month", "/schedule", "Schedule"),
     ("timer", "/focus", "Focus timer"),
+    ("block", "/distraction-blocker", "Distraction blocker"),
     ("graphic_eq", "/ambient", "Ambient"),
     ("sort", "/priorities", "Priorities"),
     ("groups", "/collaboration", "Collaboration"),

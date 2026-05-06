@@ -2,8 +2,12 @@
   "manifest_version": 3,
   "name": "Distraction Blocker",
   "version": "1.0.0",
-  "permissions": ["webNavigation", "tabs"],
+  "permissions": ["webNavigation", "tabs", "storage"],
   "host_permissions": ["<all_urls>"],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "background": {
     "service_worker": "background.js"
   },

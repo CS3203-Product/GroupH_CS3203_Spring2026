@@ -43,5 +43,20 @@ class UserRepository:
             raise HTTPException(status_code=400, detail="Inactive user")
         return user
 
+    def get(self, db: Session, user_id: int) -> Optional[User]:
+        """Loads a user by primary key."""
+        return db.get(User, user_id)
+
+    def update_distraction_schedule(
+        self, db: Session, *, user: User, start: str, end: str
+    ) -> User:
+        """Persist distraction blocker active window (24h HH:MM strings)."""
+        user.distraction_block_start = start
+        user.distraction_block_end = end
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
 
 user_repo = UserRepository()
