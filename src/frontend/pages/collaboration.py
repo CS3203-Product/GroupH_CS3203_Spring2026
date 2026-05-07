@@ -9,7 +9,7 @@ from src.frontend.state import get_auth
 from src.productivity.collaboration_hub import CollaborationHub
 from src.productivity.collaboration_models import CollaborationInvite
 from src.db.session import get_db_context
-from src.models.models import User, Item
+from src.models.models import User, Item, Task
 from src.core.config import settings
 from src.core.security import ALGORITHM
 
@@ -71,7 +71,7 @@ class CollaborationDesk:
             ui.label("Send invite").classes("text-lg font-semibold")
 
             self.task_select = ui.select(
-                options={},
+                options=[],
                 label="Select one of your tasks",
             ).classes("w-full")
 
@@ -167,8 +167,8 @@ class CollaborationDesk:
                     return
 
                 for invite in invites:
-                    item = db.get(Item, invite.task_id)
-                    task_title = item.title if item else "Unknown task"
+                    task = db.get(Task, invite.task_id)
+                    task_title = task.name if task else "Unknown task"
 
                     with ui.row().classes("items-center gap-2 flex-wrap"):
                         ui.label(
@@ -216,6 +216,7 @@ class CollaborationDesk:
             self.result_label.text = self.hub.accept_invite(
                 db,
                 invite_id,
+                self.current_user_email,
             )
 
         self.refresh_my_tasks_dropdown()
@@ -227,11 +228,10 @@ class CollaborationDesk:
             self.result_label.text = self.hub.decline_invite(
                 db,
                 invite_id,
+                self.current_user_email,
             )
 
         self.refresh_invites()
-
-
 @ui.page("/collaboration")
 def collaboration_page() -> None:
     if not guard_authenticated():

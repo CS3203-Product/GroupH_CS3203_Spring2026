@@ -3,7 +3,7 @@
 from sqlmodel import Session, select
 
 from src.productivity.collaboration_models import CollaborationInvite
-from src.models.models import User, Item
+from src.models.models import User, Item, Task
 
 
 class CollaborationHub:
@@ -42,11 +42,28 @@ class CollaborationHub:
         if item.owner_id != sender_user.id:
             return "Only the owner can invite others to this task."
 
+        task_row = db.exec(
+            select(Task).where(
+                Task.name == item.title,
+                Task.owner == sender_email,
+            )
+        ).first()
+
+        if not task_row:
+            task_row = Task(
+                name=item.title,
+                owner=sender_email,
+            )
+
+            db.add(task_row)
+            db.commit()
+            db.refresh(task_row)
+
         existing_invite = db.exec(
             select(CollaborationInvite).where(
                 CollaborationInvite.sender == sender_email,
                 CollaborationInvite.receiver == receiver_email,
-                CollaborationInvite.task_id == item.id,
+                CollaborationInvite.task_id == task_row.id,
                 CollaborationInvite.status == "pending",
             )
         ).first()
@@ -57,7 +74,7 @@ class CollaborationHub:
         already_accepted = db.exec(
             select(CollaborationInvite).where(
                 CollaborationInvite.receiver == receiver_email,
-                CollaborationInvite.task_id == item.id,
+                CollaborationInvite.task_id == task_row.id,
                 CollaborationInvite.status == "accepted",
             )
         ).first()
@@ -68,7 +85,7 @@ class CollaborationHub:
         invite = CollaborationInvite(
             sender=sender_email,
             receiver=receiver_email,
-            task_id=item.id,
+            task_id=task_row.id,
             status="pending",
         )
 
@@ -88,18 +105,28 @@ class CollaborationHub:
             )
         ).all()
 
-    def accept_invite(self, db: Session, invite_id: int) -> str:
+    def accept_invite(
+        self,
+        db: Session,
+        invite_id: int,
+        user_email: str,
+    ) -> str:
         invite = db.get(CollaborationInvite, invite_id)
 
         if not invite:
             return "Invite not found."
 
+        user_email = user_email.strip().lower()
+
+        if invite.receiver != user_email:
+            return "You do not have permission to accept this invite."
+
         if invite.status != "pending":
             return "Invite is not pending."
 
-        original_item = db.get(Item, invite.task_id)
+        task_row = db.get(Task, invite.task_id)
 
-        if not original_item:
+        if not task_row:
             return "Original task not found."
 
         receiver_user = db.exec(
@@ -111,23 +138,25 @@ class CollaborationHub:
 
         existing_item = db.exec(
             select(Item).where(
-                Item.title == original_item.title,
+                Item.title == task_row.name,
                 Item.owner_id == receiver_user.id,
             )
         ).first()
 
         if existing_item:
             invite.status = "accepted"
+
             db.add(invite)
             db.commit()
             db.refresh(invite)
+
             return f"{invite.receiver} already has this task."
 
         new_item = Item(
-            title=original_item.title,
-            description=original_item.description,
+            title=task_row.name,
+            description=None,
             owner_id=receiver_user.id,
-            category=original_item.category,
+            category="general",
             time_spent_minutes=0,
             is_completed=False,
         )
@@ -135,19 +164,31 @@ class CollaborationHub:
         db.add(new_item)
 
         invite.status = "accepted"
+
         db.add(invite)
 
         db.commit()
+
         db.refresh(invite)
         db.refresh(new_item)
 
         return f"{invite.receiver} accepted the invite. Task added to their home screen."
 
-    def decline_invite(self, db: Session, invite_id: int) -> str:
+    def decline_invite(
+        self,
+        db: Session,
+        invite_id: int,
+        user_email: str,
+    ) -> str:
         invite = db.get(CollaborationInvite, invite_id)
 
         if not invite:
             return "Invite not found."
+
+        user_email = user_email.strip().lower()
+
+        if invite.receiver != user_email:
+            return "You do not have permission to decline this invite."
 
         if invite.status != "pending":
             return "Invite is not pending."
@@ -155,6 +196,7 @@ class CollaborationHub:
         invite.status = "declined"
 
         db.add(invite)
+
         db.commit()
         db.refresh(invite)
 
