@@ -133,53 +133,10 @@ def _ensure_user_distraction_columns() -> None:
             conn.execute(text(stmt))
 
 
-def _consolidate_blocked_site_tables() -> None:
-    """Use a single table ``blocked_site``. Migrates or drops legacy ``blocked_sites``."""
-    inspector = inspect(engine)
-    dialect = engine.dialect.name
-    schema = settings.SCHEMA_NAME
-
-    if dialect == "sqlite":
-        has_legacy = inspector.has_table("blocked_sites")
-        has_current = inspector.has_table("blocked_site")
-        legacy_ident = "blocked_sites"
-        current_ident = "blocked_site"
-    else:
-        has_legacy = inspector.has_table("blocked_sites", schema=schema)
-        has_current = inspector.has_table("blocked_site", schema=schema)
-        legacy_ident = f'"{schema}"."blocked_sites"'
-        current_ident = f'"{schema}"."blocked_site"'
-
-    if not has_legacy:
-        return
-
-    with engine.begin() as conn:
-        if has_current:
-            if dialect == "sqlite":
-                conn.execute(
-                    text(
-                        f"INSERT OR IGNORE INTO {current_ident} (owner_id, url) "
-                        f"SELECT owner_id, url FROM {legacy_ident}"
-                    )
-                )
-            else:
-                conn.execute(
-                    text(
-                        f"INSERT INTO {current_ident} (owner_id, url) "
-                        f"SELECT owner_id, url FROM {legacy_ident} "
-                        f"ON CONFLICT (owner_id, url) DO NOTHING"
-                    )
-                )
-            conn.execute(text(f"DROP TABLE {legacy_ident}"))
-        else:
-            conn.execute(text(f"ALTER TABLE {legacy_ident} RENAME TO blocked_site"))
-
-
 def init() -> None:
     """Initializes the database, creating all necessary tables
     and ensuring the first superuser account is created."""
     SQLModel.metadata.create_all(engine)
-    _consolidate_blocked_site_tables()
     _ensure_item_tracker_columns()
     _ensure_weekly_schedule_tracker_columns()
     _ensure_user_distraction_columns()
