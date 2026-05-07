@@ -49,7 +49,7 @@ tests/                 # pytest (scheduler, collaboration, analytics, audio, blo
 
 ```bash or powershell
 git clone https://github.com/CS3203-Product/GroupH_CS3203_Spring2026.git
-cd CS3203-Productivity-App
+cd GroupH_CS3203_Spring2026
 python3 -m venv .venv
 Mac: source .venv/bin/activate
 Windows: .venv\Scripts\activate    

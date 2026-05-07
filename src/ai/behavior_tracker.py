@@ -2,6 +2,7 @@ from collections import defaultdict
 from statistics import mean
 
 from src.db.models_ai import TaskExecutionLog
+from sqlmodel import select
 
 
 class BehaviorTracker:
@@ -24,12 +25,9 @@ class BehaviorTracker:
 
     def build_behavior_profile(self, user_id):
 
-        logs = (
-            self.session.query(TaskExecutionLog)
-            .filter_by(user_id=user_id)
-            .all()
-        )
-
+        logs = self.session.exec(
+            select(TaskExecutionLog).where(TaskExecutionLog.user_id == user_id)
+            ).all()
         if not logs:
             return self.default_profile()
 
@@ -112,10 +110,10 @@ class BehaviorTracker:
 
         for log in logs:
 
-            if not log.start_time:
+            if not log.started_at:
                 continue
 
-            hour = log.start_time.hour
+            hour = log.started_at.hour
 
             if log.was_completed:
                 hour_scores[hour] += 2
@@ -140,10 +138,10 @@ class BehaviorTracker:
 
         for log in logs:
 
-            if not log.start_time:
+            if not log.started_at:
                 continue
 
-            weekday = log.start_time.weekday()
+            weekday = log.started_at.weekday()
 
             if log.was_completed:
                 day_scores[weekday] += 1

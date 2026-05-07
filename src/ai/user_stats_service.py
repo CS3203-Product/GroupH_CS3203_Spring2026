@@ -1,74 +1,76 @@
-from sqlalchemy import func
+from sqlmodel import select
 
-from db.models_ai import TaskExecutionLog, UserBehaviorStats
+from src.db.models_ai import TaskExecutionLog, UserBehaviorStats
 
 
-# =========================================================
-# REBUILD USER STATS
-# =========================================================
+def get_user_stats(session, user_id):
+    """Get user stats or create default if not exists."""
+    stats = session.exec(
+        select(UserBehaviorStats).where(UserBehaviorStats.user_id == user_id)
+    ).first()
+
+    if not stats:
+        return rebuild_user_stats(session, user_id)
+
+    return stats
+
 
 def rebuild_user_stats(session, user_id):
-
-    logs = (
-        session.query(TaskExecutionLog)
-        .filter_by(user_id=user_id)
-        .all()
-    )
+    logs = session.exec(
+        select(TaskExecutionLog).where(TaskExecutionLog.user_id == user_id)
+    ).all()
 
     if not logs:
-
         default_stats = UserBehaviorStats(
             user_id=user_id,
             avg_task_duration=1.0,
             completion_rate=0.5,
             avg_delay=0.0,
-            overdue_tasks=0
+            overdue_tasks=0,
         )
 
         session.add(default_stats)
         session.commit()
+        session.refresh(default_stats)
 
         return default_stats
 
     total_tasks = len(logs)
 
-    completed_tasks = sum(
-        1 for l in logs if l.was_completed
-    )
+    completed_tasks = sum(1 for log in logs if log.was_completed)
 
-    delayed_tasks = [
-        l.delay_amount for l in logs
-        if l.was_delayed
+    delays = [
+        log.delay_amount
+        for log in logs
+        if log.was_delayed and log.delay_amount is not None
     ]
 
     durations = [
-        l.actual_duration for l in logs
-        if l.actual_duration
+        log.actual_duration
+        for log in logs
+        if log.actual_duration is not None
     ]
 
-    avg_duration = (
-        sum(durations) / len(durations)
-        if durations else 1.0
-    )
-
+    avg_duration = sum(durations) / len(durations) if durations else 1.0
     completion_rate = completed_tasks / total_tasks
+    avg_delay = sum(delays) / len(delays) if delays else 0.0
+    overdue_tasks = len(delays)
 
-    avg_delay = (
-        sum(delayed_tasks) / len(delayed_tasks)
-        if delayed_tasks else 0.0
-    )
+    stats = session.exec(
+        select(UserBehaviorStats).where(UserBehaviorStats.user_id == user_id)
+    ).first()
 
-    overdue_tasks = len(delayed_tasks)
+    if not stats:
+        stats = UserBehaviorStats(user_id=user_id)
+        session.add(stats)
 
-    stats = UserBehaviorStats(
-        user_id=user_id,
-        avg_task_duration=avg_duration,
-        completion_rate=completion_rate,
-        avg_delay=avg_delay,
-        overdue_tasks=overdue_tasks
-    )
+    stats.avg_task_duration = avg_duration
+    stats.completion_rate = completion_rate
+    stats.avg_delay = avg_delay
+    stats.overdue_tasks = overdue_tasks
 
-    session.merge(stats)
+    session.add(stats)
     session.commit()
+    session.refresh(stats)
 
     return stats

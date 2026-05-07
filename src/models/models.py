@@ -1,6 +1,4 @@
 from typing import Optional
-
-from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from src.core.config import settings
@@ -65,6 +63,59 @@ class UserRead(UserBase):
 
     id: int
 
+class WeeklyScheduleEntry(SQLModel, table=True):
+    """A single time-block row on the weekly importance × weekday grid."""
+
+    __tablename__ = "weekly_schedule_entry"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    due_day: str
+    importance: int = Field(default=0)
+    category: str = Field(default="general")
+    sort_order: int = Field(default=0)
+    time_spent_minutes: float = Field(default=0.0)
+    is_completed: bool = Field(default=False)
+
+    owner_id: Optional[int] = Field(
+        default=None,
+        foreign_key=f"{settings.SCHEMA_NAME}.user.id",
+    )
+
+    owner: Optional["User"] = Relationship(back_populates="weekly_schedule_entries")
+
+    __table_args__ = TABLE_ARGS
+
+
+class WeeklyScheduleEntryUpdate(SQLModel):
+    """Partial update for a weekly schedule row."""
+
+    name: Optional[str] = None
+    due_day: Optional[str] = None
+    importance: Optional[int] = None
+    category: Optional[str] = None
+    sort_order: Optional[int] = None
+    time_spent_minutes: Optional[float] = None
+    is_completed: Optional[bool] = None
+
+class BlockedSite(SQLModel, table=True):
+    """Blocked hostnames for the browser distraction blocker."""
+
+    __tablename__ = "blocked_site"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(
+        foreign_key=f"{settings.SCHEMA_NAME}.user.id",
+        index=True,
+    )
+    url: str = Field(max_length=2048)
+
+    owner: Optional["User"] = Relationship(back_populates="blocked_sites")
+
+    __table_args__ = (
+        UniqueConstraint("owner_id", "url", name="uq_blocked_site_owner_url"),
+        TABLE_ARGS,
+    )
 
 class ItemBase(SQLModel):
     """The base model for items, containing the core fields: title and description."""
@@ -76,34 +127,30 @@ class ItemBase(SQLModel):
 class ItemCreate(ItemBase):
     """Inherits from ItemBase and is used for validating the data when a new item is created."""
 
-    category: str = Field(default="general")
+    pass
 
 
 class ItemUpdate(SQLModel):
-    """Used for updating an existing item. Its fields (title, description) are optional,
+    """Used for updating an existing item. Its fields are optional,
     allowing for partial updates where only the changed fields need to be provided."""
 
     title: Optional[str] = None
     description: Optional[str] = None
-    category: Optional[str] = None
-    time_spent_minutes: Optional[float] = None
-    is_completed: Optional[bool] = None
 
 
 class Item(ItemBase, table=True):
-    """The database table model for an item. It includes the ItemBase fields along with an id (primary key) and an owner_id,
-    which is a foreign key linking the item to a user. It also defines the relationship back to the User model."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
+
     title: str
-    category: str = Field(default="general")
-    time_spent_minutes: float = Field(default=0.0)
-    is_completed: bool = Field(default=False)
     owner_id: Optional[int] = Field(
-        default=None, foreign_key=f"{settings.SCHEMA_NAME}.user.id"
+        default=None,
+        foreign_key=f"{settings.SCHEMA_NAME}.user.id"
     )
+
     owner: Optional["User"] = Relationship(
-        back_populates="items", sa_relationship_kwargs={"foreign_keys": "Item.owner_id"}
+        back_populates="items",
+        sa_relationship_kwargs={"foreign_keys": "Item.owner_id"}
     )
 
     __table_args__ = TABLE_ARGS
@@ -117,7 +164,6 @@ class ItemRead(ItemBase):
     category: str = "general"
     time_spent_minutes: float = 0.0
     is_completed: bool = False
-
 
 class Task(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

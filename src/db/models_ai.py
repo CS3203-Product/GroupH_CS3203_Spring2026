@@ -1,92 +1,122 @@
-# src/db/models_ai.py
+from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import (
-    Column,
-    Integer,
-    Float,
-    Boolean,
-    DateTime,
-    String
-)
+from sqlmodel import SQLModel, Field
+from src.core.config import settings
 
 
-from src.db.base import Base
+# =========================================================
+# TASK EXECUTION LOG
+# =========================================================
 
-class TaskExecutionLog(Base):
+class TaskExecutionLog(SQLModel, table=True):
+
     __tablename__ = "task_execution_logs"
+    __table_args__ = {"schema": settings.SCHEMA_NAME}
 
-    id = Column(Integer, primary_key=True)
+    id: Optional[int] = Field(
+        default=None,
+        primary_key=True
+    )
 
     # =====================================
     # IDENTIFIERS
     # =====================================
 
-    user_id = Column(Integer, nullable=False)
-    task_id = Column(Integer, nullable=False)
+    user_id: int = Field(
+    foreign_key=f"{settings.SCHEMA_NAME}.user.id"
+    )
+
+    task_id: int = Field(
+    foreign_key=f"{settings.SCHEMA_NAME}.item.id"
+    )
 
     # =====================================
     # TASK METADATA
     # =====================================
 
-    category = Column(String)
-    difficulty = Column(Integer)
-    user_importance = Column(Integer)
+    category: Optional[str] = None
 
-    estimated_duration = Column(Float)
-    actual_duration = Column(Float)
+    difficulty: Optional[int] = None
+
+    user_importance: Optional[int] = None
+
+    estimated_duration: Optional[float] = None
+
+    actual_duration: Optional[float] = None
 
     # =====================================
     # TIMING
     # =====================================
 
-    assigned_at = Column(DateTime)
-    started_at = Column(DateTime)
-    completed_at = Column(DateTime)
-    deadline = Column(DateTime)
+    assigned_at: Optional[datetime] = None
+
+    started_at: Optional[datetime] = None
+
+    completed_at: Optional[datetime] = None
+
+    deadline: Optional[datetime] = None
 
     # =====================================
     # OUTCOMES
     # =====================================
-    was_completed = Column(Boolean)
-    was_delayed = Column(Boolean)
-    missed_deadline = Column(Boolean)
 
-    delay_amount = Column(Float)
+    was_completed: bool = False
 
-    completion_quality = Column(Float)
+    was_delayed: bool = False
+
+    missed_deadline: bool = False
+
+    delay_amount: Optional[float] = None
+
+    completion_quality: Optional[float] = None
 
     # =====================================
     # PRODUCTIVITY SIGNALS
     # =====================================
-    
-    focus_score = Column(Float)
-    stress_level = Column(Float)
 
-    interruptions = Column(Integer)
-    reschedule_count = Column(Integer)
+    focus_score: Optional[float] = None
+
+    stress_level: Optional[float] = None
+
+    interruptions: Optional[int] = None
+
+    reschedule_count: Optional[int] = None
 
     # =====================================
     # CONTEXT
     # =====================================
 
-    day_of_week = Column(Integer)
-    hour_started = Column(Integer)
+    day_of_week: Optional[int] = None
 
-    session_type = Column(String)
+    hour_started: Optional[int] = None
 
-    created_at = Column(DateTime)
+    session_type: Optional[str] = None
 
-class UserBehaviorStats(Base):
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow
+    )
+
+
+# =========================================================
+# USER BEHAVIOR STATS
+# =========================================================
+
+class UserBehaviorStats(SQLModel, table=True):
+
     __tablename__ = "user_behavior_stats"
+    __table_args__ = {"schema": settings.SCHEMA_NAME}
+    id: Optional[int] = Field(
+        default=None,
+        primary_key=True
+    )
 
-    id = Column(Integer, primary_key=True)
+    user_id: int = Field(unique=True)
 
-    user_id = Column(Integer, nullable=False, unique=True)
+    avg_task_duration: float = 1.0
 
-    avg_task_duration = Column(Float, default=1.0)
+    completion_rate: float = 0.5
 
-    completion_rate = Column(Float, default=0.5)
+    avg_delay: float = 0.0
 
-    avg_delay = Column(Float, default=0.0)
-
-    overdue_tasks = Column(Integer, default=0)
+    overdue_tasks: int = 0
