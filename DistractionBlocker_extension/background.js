@@ -1,9 +1,21 @@
-const DEFAULT_API_BASE = 'http://localhost:8000';
+importScripts('api-config.js');
+
+function normalizeApiBase(url) {
+  return (url || '').trim().replace(/\/$/, '');
+}
 
 async function getApiBaseUrl() {
-  const { apiBaseUrl } = await chrome.storage.local.get(['apiBaseUrl']);
-  const raw = typeof apiBaseUrl === 'string' ? apiBaseUrl.trim() : '';
-  return (raw || DEFAULT_API_BASE).replace(/\/$/, '');
+  const { apiBaseUrl, apiEnvironment } = await chrome.storage.local.get([
+    'apiBaseUrl',
+    'apiEnvironment',
+  ]);
+  const override = normalizeApiBase(typeof apiBaseUrl === 'string' ? apiBaseUrl : '');
+  if (override) return override;
+
+  const bases = self.DISTRACTION_BLOCKER_API_BASES;
+  const key = apiEnvironment === 'prod' ? 'prod' : 'dev';
+  const preset = bases[key] || bases.dev;
+  return normalizeApiBase(preset);
 }
 
 async function getAccessToken() {

@@ -39,7 +39,17 @@
     <h1>Distraction Blocker</h1>
     <p>Point the extension at your FastAPI server and sign in with your UnCram account.</p>
 
-    <label for="apiBaseUrl">API base URL (no trailing slash)</label>
+    <fieldset
+      style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem"
+    >
+      <legend style="font-size: 0.875rem">API environment</legend>
+      <label style="margin-right: 1rem"
+        ><input type="radio" name="apiEnv" value="dev" checked /> Development</label
+      >
+      <label><input type="radio" name="apiEnv" value="prod" /> Production</label>
+    </fieldset>
+
+    <label for="apiBaseUrl">API base URL (optional override, no trailing slash)</label>
     <input
       id="apiBaseUrl"
       type="url"
@@ -60,6 +70,7 @@
     </div>
 
     <p id="status"></p>
+    <script src="api-config.js"></script>
     <script src="options.js"></script>
   </body>
 </html>
