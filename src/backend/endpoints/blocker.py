@@ -87,6 +87,8 @@ def check_url(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     sites = blocked_site_repo.list_urls(db, owner_id=owner_id)
+    logger.debug("check-url sites owner_id=%s sites=%s", owner_id, sites)
+    print("check-url sites owner_id=%s sites=%s", owner_id, sites)
     blocker.set_blocked_sites(sites)
     current_time = datetime.now().strftime("%H:%M")
     logger.debug(
