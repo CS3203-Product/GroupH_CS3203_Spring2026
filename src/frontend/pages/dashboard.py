@@ -15,13 +15,13 @@ from src.db.session import get_db_context
 from src.frontend.components import notifications
 from src.frontend.components.auth_utils import get_current_user_from_state
 from src.frontend.layouts.default import dashboard_frame, guard_authenticated
-from src.models import ItemCreate, ItemUpdate
+from src.models import ItemUpdate
 from src.productivity.task_analytics_dashboard import TaskAnalyticsDashboard
 from src.repositories.item import item_repo
 from src.repositories.weekly_schedule import weekly_schedule_repo
 
 
-REFRESH_SECONDS = 3.0
+REFRESH_SECONDS = 0.2  # Set to 0 for manual refresh only, or a positive number for auto-refresh
 
 
 def _stat_card(icon: str, value: str, label: str, color: str) -> None:
@@ -246,8 +246,7 @@ class DashboardView:
         self._charts_container = ui.column().classes("w-full")
         self._build_tracker_panel()
 
-        self.refresh()
-        ui.timer(REFRESH_SECONDS, self.refresh)
+        ui.timer(0.2, self.refresh, once=True)
 
     def refresh(self) -> None:
         """Refresh dashboard data without navigating or rebuilding the whole page."""
@@ -326,38 +325,17 @@ class DashboardView:
                     )
 
     def _build_tracker_panel(self) -> None:
-        """Quick-add panel for DB-backed task creation, completion, and refresh."""
-        ui.label("Quick tracker").classes(
+        """Dashboard tracking panel. Task creation lives on the Task Board page."""
+        ui.label("Task tracker").classes(
             "text-h6 font-bold text-emerald-700 dark:text-emerald-300 mt-6 mb-2"
         )
 
         with ui.card().classes("w-full p-5"):
-            with ui.row().classes("w-full gap-3 flex-wrap items-end"):
-                title_in = ui.input("Task title").classes("flex-1 min-w-[160px]")
-                cat_in = ui.select(
-                    ["general", "work", "study", "health", "personal", "programming", "reading"],
-                    value="general",
-                    label="Category",
-                ).classes("min-w-[140px]")
-                difficulty_in = ui.number("Difficulty", value=5, min=1, max=10, step=1).classes("w-32")
-                importance_in = ui.number("Importance", value=5, min=1, max=10, step=1).classes("w-32")
-                duration_in = ui.number("Est. hours", value=1.0, min=0.25, step=0.25).classes("w-32")
-                ui.button(
-                    "Add task",
-                    icon="add",
-                    on_click=lambda: self._add_task(
-                        title_in,
-                        cat_in,
-                        difficulty_in,
-                        importance_in,
-                        duration_in,
-                    ),
-                ).props("color=primary")
-                ui.button("Refresh", icon="refresh", on_click=self.refresh).props("outline")
+            ui.label(
+                "Create new tasks from the Task Board. Use this dashboard to refresh analytics and mark open tasks complete."
+            ).classes("text-sm text-slate-500 dark:text-slate-400")
 
-            ui.separator().classes("my-3")
-
-            with ui.row().classes("w-full gap-3 flex-wrap items-end"):
+            with ui.row().classes("w-full gap-3 flex-wrap items-end mt-3"):
                 self._log_select = ui.select(options={}, label="Select open task").classes(
                     "flex-1 min-w-[200px]"
                 )
@@ -366,6 +344,7 @@ class DashboardView:
                     icon="check",
                     on_click=lambda: self._mark_done(self._log_select),
                 ).props("outline color=positive")
+                ui.button("Refresh", icon="refresh", on_click=self.refresh).props("outline")
 
         self._table_container = ui.column().classes("w-full")
 
@@ -429,43 +408,6 @@ class DashboardView:
                 "w-full mt-3"
             ).props("dense flat bordered")
 
-    def _add_task(
-        self,
-        title_in: ui.input,
-        cat_in: ui.select,
-        difficulty_in: ui.number,
-        importance_in: ui.number,
-        duration_in: ui.number,
-    ) -> None:
-        title = (title_in.value or "").strip()
-        if not title:
-            notifications.show_error("Please enter a task title.")
-            return
-
-        try:
-            with get_db_context() as db:
-                current_user = get_current_user_from_state(db)
-                item_in = ItemCreate(
-                    title=title,
-                    description="",
-                    category=cat_in.value or "general",
-                    difficulty=int(difficulty_in.value or 5),
-                    user_importance=int(importance_in.value or 5),
-                    estimated_duration=float(duration_in.value or 1.0),
-                )
-                item_repo.create_for_user(db=db, obj_in=item_in, current_user=current_user)
-        except HTTPException as e:
-            notifications.show_error(e.detail)
-            return
-        except Exception as e:
-            notifications.show_error(f"Could not create task: {e}")
-            return
-
-        title_in.value = ""
-        notifications.show_success(f"Task '{title}' added.")
-        trigger_background_retrain()
-        self.refresh()
-
     def _mark_done(self, select: ui.select | None) -> None:
         if not select or not select.value:
             notifications.show_error("Select a task first.")
@@ -506,7 +448,6 @@ class DashboardView:
             return
 
         notifications.show_success("Task marked as complete and synced with AI.")
-        trigger_background_retrain()
         self.refresh()
 
 

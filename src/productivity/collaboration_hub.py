@@ -157,8 +157,7 @@ class CollaborationHub:
             description=None,
             owner_id=receiver_user.id,
             category="general",
-            time_spent_minutes=0,
-            is_completed=False,
+            completed=False,
         )
 
         db.add(new_item)

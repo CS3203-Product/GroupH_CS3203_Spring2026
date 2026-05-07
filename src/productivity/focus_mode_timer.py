@@ -83,3 +83,75 @@ class FocusModeTimer:
             self.timer_display.classes("text-blue-600", remove="text-orange-500")
         else:
             self.timer_display.classes("text-orange-500", remove="text-blue-600")
+
+
+class FocusTaskTimer:
+    """Count-up task timer using the same visual style as the Focus Mode timer."""
+
+    def __init__(
+        self,
+        *,
+        task_title: str,
+        started_at,
+        on_complete=None,
+        compact: bool = False,
+    ):
+        from datetime import datetime
+
+        self.task_title = task_title
+        self.started_at = started_at or datetime.utcnow()
+        self.on_complete = on_complete
+        self.is_running = True
+
+        card_classes = "w-full items-center shadow-lg p-5"
+        if compact:
+            card_classes = "w-full items-center shadow-md p-4 bg-slate-50 dark:bg-slate-900"
+
+        with ui.card().classes(card_classes):
+            ui.label("Task timer").classes("text-xs uppercase tracking-wide text-slate-500")
+            self.label = ui.label(task_title).classes("text-h6 font-bold text-center")
+            self.timer_display = ui.label(self.format_elapsed()).classes(
+                "text-h3 font-mono text-blue-600"
+            )
+            self.status = ui.label("Focus session running").classes(
+                "text-caption text-slate-600 dark:text-slate-300"
+            )
+
+            with ui.row().classes("gap-2 justify-center"):
+                self.pause_btn = ui.button("Pause", on_click=self.toggle).props(
+                    "color=primary outline"
+                )
+                if on_complete is not None:
+                    ui.button(
+                        "Complete task",
+                        icon="task_alt",
+                        on_click=on_complete,
+                    ).props("color=positive elevated")
+
+        self.tick_timer = ui.timer(1.0, self.tick, active=True)
+
+    def elapsed_seconds(self) -> int:
+        from datetime import datetime
+
+        try:
+            return max(0, int((datetime.utcnow() - self.started_at).total_seconds()))
+        except TypeError:
+            return 0
+
+    def format_elapsed(self) -> str:
+        total_seconds = self.elapsed_seconds()
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
+
+    def toggle(self) -> None:
+        self.is_running = not self.is_running
+        self.tick_timer.active = self.is_running
+        self.pause_btn.text = "Pause" if self.is_running else "Resume"
+        self.status.text = "Focus session running" if self.is_running else "Timer display paused"
+
+    def tick(self) -> None:
+        self.timer_display.text = self.format_elapsed()
+

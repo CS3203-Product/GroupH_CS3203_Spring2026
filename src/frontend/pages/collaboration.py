@@ -149,7 +149,7 @@ class CollaborationDesk:
             with self.task_list:
                 for item in items:
                     ui.label(
-                        f"Task: {item.title} | Category: {item.category} | Completed: {item.is_completed}"
+                        f"Task: {item.title} | Category: {item.category} | Completed: {item.completed}"
                     )
 
     def refresh_invites(self) -> None:

@@ -185,7 +185,6 @@ def render_priority_card(idx: int, task: dict):
         with ui.row().classes("w-full justify-between text-sm"):
             ui.label(f"Est: {duration:.1f}h").classes("text-slate-600")
             ui.label(f"Difficulty: {task['difficulty']}").classes("text-slate-500")
-            ui.label(f"Importance: {task['user_importance']}").classes("text-slate-500")
             ui.label(f"Category: {task['category']}").classes("text-slate-500")
 
         if task["deadline"]:

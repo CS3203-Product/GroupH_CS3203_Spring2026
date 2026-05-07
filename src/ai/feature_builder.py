@@ -5,6 +5,36 @@ from datetime import datetime
 # CATEGORY ENCODING
 # =========================================================
 
+
+
+def _deadline_importance(task) -> float:
+    """Convert a task deadline into a 1-10 urgency value for the priority model.
+
+    Earlier due dates produce higher urgency. This replaces user-entered
+    importance in the UI while preserving the feature expected by the saved model.
+    """
+    deadline = getattr(task, "deadline", None)
+    if not deadline:
+        return float(getattr(task, "user_importance", 5))
+
+    now = datetime.utcnow()
+    hours_until_deadline = (deadline - now).total_seconds() / 3600
+
+    if hours_until_deadline <= 24:
+        return 10.0
+    if hours_until_deadline <= 48:
+        return 9.0
+    if hours_until_deadline <= 72:
+        return 8.0
+    if hours_until_deadline <= 7 * 24:
+        return 7.0
+    if hours_until_deadline <= 14 * 24:
+        return 6.0
+    if hours_until_deadline <= 30 * 24:
+        return 5.0
+    return 4.0
+
+
 CATEGORY_MAP = {
     "study": 0,
     "programming": 1,
@@ -98,9 +128,9 @@ def build_task_features(task, user_stats=None):
             getattr(task, "difficulty", 5)
         ),
 
-        "importance": float(
-            getattr(task, "user_importance", 5)
-        ),
+        # The UI no longer asks users for importance.
+        # Priority urgency is inferred from the due date instead.
+        "importance": _deadline_importance(task),
 
         "category": float(category),
 

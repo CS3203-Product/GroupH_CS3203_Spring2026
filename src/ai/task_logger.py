@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from src.db.models_ai import TaskExecutionLog
-from src.ai.auto_retrain import trigger_background_retrain
 from src.ai.user_stats_service import rebuild_user_stats
 from sqlmodel import select
 
@@ -148,4 +147,4 @@ class TaskLogger:
 # =====================================
 
 
-        trigger_background_retrain()
+        # trigger_background_retrain()  # disabled to prevent file-watch reloads during UI actions

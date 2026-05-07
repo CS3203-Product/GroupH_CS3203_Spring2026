@@ -60,7 +60,7 @@ if __name__ in {"__main__", "__mp_main__"}:
         title="UnCram · CS3203 Productivity",
         port=8000,
         storage_secret=settings.SECRET_KEY,
-        reload=True,
+        reload=False,
         fastapi_docs=True,
         dark=True,
     )
