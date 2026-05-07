@@ -91,7 +91,7 @@ def check_url(
     print("check-url sites owner_id=%s sites=%s", owner_id, sites)
     blocker.set_blocked_sites(sites)
     current_time = datetime.now().strftime("%H:%M")
-    logger.debug(
+    print(
         "check-url owner_id=%s url=%s current_time=%s user_db=%s blocked_urls=%s",
         owner_id,
         req.url,
