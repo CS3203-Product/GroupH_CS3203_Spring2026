@@ -1,5 +1,6 @@
 """Distraction blocker API: blocked sites in Postgres + JWT auth."""
 
+import logging
 from datetime import datetime
 
 from DistractionBlocker import DistractionBlocker
@@ -13,6 +14,8 @@ from src.core import security
 from src.db.session import get_db
 from src.repositories.blocked_site import blocked_site_repo
 from src.repositories.user import user_repo
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 blocker = DistractionBlocker()
@@ -86,6 +89,19 @@ def check_url(
     sites = blocked_site_repo.list_urls(db, owner_id=owner_id)
     blocker.set_blocked_sites(sites)
     current_time = datetime.now().strftime("%H:%M")
+    logger.debug(
+        "check-url owner_id=%s url=%s current_time=%s user_db=%s blocked_urls=%s",
+        owner_id,
+        req.url,
+        current_time,
+        {
+            "id": user.id,
+            "email": user.email,
+            "distraction_block_start": user.distraction_block_start,
+            "distraction_block_end": user.distraction_block_end,
+        },
+        sites,
+    )
     try:
         is_blocked = blocker.check_access(
             req.url,
