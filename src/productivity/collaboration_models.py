@@ -2,8 +2,6 @@
 
 from typing import Optional
 from sqlmodel import SQLModel, Field
-from src.core.config import settings
-
 
 class CollaborationTask:
     def __init__(self, name: str, owner: str, due_day=None):
@@ -14,7 +12,6 @@ class CollaborationTask:
 
 class CollaborationInvite(SQLModel, table=True):
     __tablename__ = "invite"
-    __table_args__ = {"schema": settings.SCHEMA_NAME}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     sender: str

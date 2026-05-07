@@ -1,61 +1,58 @@
+from src.db.session import get_db_context
+from src.productivity.collaboration_hub import CollaborationHub
+from src.productivity.collaboration_models import CollaborationTask
+from src.models.models import Task
 from sqlmodel import select
 
-from src.db.session import get_db_context
-from src.models.models import Item, User
-from src.productivity.collaboration_hub import CollaborationHub
+hub = CollaborationHub()
 
+task = CollaborationTask(
+    name="Finish CS Project",
+    owner="Zander",
+    due_day="Friday"
+)
 
-def main():
-    hub = CollaborationHub()
+with get_db_context() as db:
 
-    with get_db_context() as db:
-        sender = db.exec(
-            select(User).where(User.email == "sender@example.com")
-        ).first()
+    task_row = db.exec(
+        select(Task).where(Task.name == "Finish CS Project")
+    ).first()
 
-        receiver = db.exec(
-            select(User).where(User.email == "receiver@example.com")
-        ).first()
-
-        if not sender:
-            print("Sender user not found.")
-            return
-
-        if not receiver:
-            print("Receiver user not found.")
-            return
-
-        task_row = db.exec(
-            select(Item).where(
-                Item.title == "Finish CS Project",
-                Item.owner_id == sender.id,
-            )
-        ).first()
-
-        if not task_row:
-            task_row = Item(
-                title="Finish CS Project",
-                description="Demo collaboration task",
-                owner_id=sender.id,
-                category="general",
-                difficulty=5,
-                user_importance=5,
-                estimated_duration=1.0,
-            )
-
-            db.add(task_row)
-            db.commit()
-            db.refresh(task_row)
-
-        message = hub.send_invite(
-            db=db,
-            sender=sender,
-            receiver=receiver,
-            item=task_row,
+    if not task_row:
+        task_row = Task(
+            name="Finish CS Project",
+            owner="Zander"
         )
+        db.add(task_row)
+        db.commit()
+        db.refresh(task_row)
 
-        print(message)
+    # send invite
+    print(hub.send_invite(db, "Zander", "Alex", task))
 
+    invites = hub.view_invites(db, "Alex")
 
-if __name__ == "__main__":
-    main()
+    print("Alex's pending invites:")
+    for invite in invites:
+        print(invite.sender, invite.receiver, invite.task_id, invite.status)
+
+    # test accept invite
+    if invites:
+        first_invite = invites[0]
+        print(hub.accept_invite(db, first_invite.id))
+
+        
+    invites = hub.view_invites(db, "Alex")
+
+    #test decline invite
+    if invites:
+        first_invite = invites[0]
+        print(hub.decline_invite(db, first_invite.id))
+
+        print("Can Alex view task?")
+
+    #test view permissions
+    print(hub.can_view_task(db, "Alex", task_row))
+
+    print("Can Bob view task?")
+    print(hub.can_view_task(db, "Bob", task_row))
