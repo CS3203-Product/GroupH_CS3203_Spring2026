@@ -1,7 +1,8 @@
 from typing import Optional
 from sqlmodel import Field, Relationship, SQLModel
-
+from sqlalchemy import UniqueConstraint
 from src.core.config import settings
+from datetime import datetime
 
 TABLE_ARGS = {"schema": settings.SCHEMA_NAME}
 
@@ -98,35 +99,27 @@ class WeeklyScheduleEntryUpdate(SQLModel):
     time_spent_minutes: Optional[float] = None
     is_completed: Optional[bool] = None
 
-class BlockedSite(SQLModel, table=True):
-    """Blocked hostnames for the browser distraction blocker."""
-
-    __tablename__ = "blocked_site"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    owner_id: int = Field(
-        foreign_key=f"{settings.SCHEMA_NAME}.user.id",
-        index=True,
-    )
-    url: str = Field(max_length=2048)
-
-    owner: Optional["User"] = Relationship(back_populates="blocked_sites")
-
-    __table_args__ = (
-        UniqueConstraint("owner_id", "url", name="uq_blocked_site_owner_url"),
-        TABLE_ARGS,
-    )
 
 class ItemBase(SQLModel):
-    """The base model for items, containing the core fields: title and description."""
+    """The base model for items."""
 
     title: str
     description: Optional[str] = None
+    completed: bool = Field(default=False)
+    category: Optional[str] = Field(default="general")
+    difficulty: int = Field(default=5)
+    user_importance: int = Field(default=5)
+    estimated_duration: float = Field(default=1.0)
+    predicted_duration: Optional[float] = None
+    predicted_priority: Optional[float] = None
+    deadline: Optional[datetime] = None
+    scheduled_start: Optional[datetime] = None
+    scheduled_end: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ItemCreate(ItemBase):
     """Inherits from ItemBase and is used for validating the data when a new item is created."""
-
     pass
 
 
@@ -136,6 +129,16 @@ class ItemUpdate(SQLModel):
 
     title: Optional[str] = None
     description: Optional[str] = None
+    completed: Optional[bool] = None
+    category: Optional[str] = None
+    difficulty: Optional[int] = None
+    user_importance: Optional[int] = None
+    estimated_duration: Optional[float] = None
+    predicted_duration: Optional[float] = None
+    predicted_priority: Optional[float] = None
+    deadline: Optional[datetime] = None
+    scheduled_start: Optional[datetime] = None
+    scheduled_end: Optional[datetime] = None
 
 
 class Item(ItemBase, table=True):
@@ -163,7 +166,7 @@ class ItemRead(ItemBase):
     owner_id: int
     category: str = "general"
     time_spent_minutes: float = 0.0
-    is_completed: bool = False
+    completed: bool = False
 
 class Task(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -173,34 +176,3 @@ class Task(SQLModel, table=True):
     __table_args__ = TABLE_ARGS
 
 
-class WeeklyScheduleEntry(SQLModel, table=True):
-    """A single time-block row on the weekly importance × weekday grid."""
-
-    __tablename__ = "weekly_schedule_entry"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    due_day: str
-    importance: int = Field(default=0)
-    category: str = Field(default="general")
-    sort_order: int = Field(default=0)
-    time_spent_minutes: float = Field(default=0.0)
-    is_completed: bool = Field(default=False)
-    owner_id: Optional[int] = Field(
-        default=None, foreign_key=f"{settings.SCHEMA_NAME}.user.id"
-    )
-    owner: Optional["User"] = Relationship(back_populates="weekly_schedule_entries")
-
-    __table_args__ = TABLE_ARGS
-
-
-class WeeklyScheduleEntryUpdate(SQLModel):
-    """Partial update for a weekly schedule row (task board / tracker)."""
-
-    name: Optional[str] = None
-    due_day: Optional[str] = None
-    importance: Optional[int] = None
-    category: Optional[str] = None
-    sort_order: Optional[int] = None
-    time_spent_minutes: Optional[float] = None
-    is_completed: Optional[bool] = None
