@@ -7,7 +7,6 @@ from jose import jwt, JWTError
 from src.frontend.layouts.default import dashboard_frame, guard_authenticated
 from src.frontend.state import get_auth
 from src.productivity.collaboration_hub import CollaborationHub
-from src.productivity.collaboration_models import CollaborationInvite
 from src.db.session import get_db_context
 from src.models.models import User, Item, Task
 from src.core.config import settings
@@ -61,10 +60,6 @@ class CollaborationDesk:
             ui.label("Failed to load your account information.").classes("text-red-500")
             return
 
-        if not self.current_user_email:
-            ui.label("Could not find your email from your login token.").classes("text-red-500")
-            return
-
         ui.label(f"Logged in as: {self.current_user_email}").classes("text-slate-500")
 
         with ui.card().classes("w-full max-w-xl p-4"):
@@ -75,37 +70,20 @@ class CollaborationDesk:
                 label="Select one of your tasks",
             ).classes("w-full")
 
-            self.receiver_email_input = ui.input(
-                "Receiver email"
-            ).classes("w-full")
+            self.receiver_email_input = ui.input("Receiver email").classes("w-full")
 
             with ui.row().classes("gap-2"):
-                ui.button(
-                    "Send invite",
-                    on_click=self.send_invite_gui,
-                ).props("color=primary")
-
-                ui.button(
-                    "Refresh task list",
-                    on_click=self.refresh_my_tasks_dropdown,
-                ).props("outline")
+                ui.button("Send invite", on_click=self.send_invite_gui).props("color=primary")
+                ui.button("Refresh task list", on_click=self.refresh_my_tasks_dropdown).props("outline")
 
         with ui.card().classes("w-full max-w-xl p-4"):
             ui.label("Pending invites").classes("text-lg font-semibold")
-
-            ui.label(
-                f"Showing invites for: {self.current_user_email}"
-            ).classes("text-slate-500")
-
-            ui.button(
-                "Refresh invites",
-                on_click=self.refresh_invites,
-            ).props("outline")
-
+            ui.label(f"Showing invites for: {self.current_user_email}").classes("text-slate-500")
+            ui.button("Refresh invites", on_click=self.refresh_invites).props("outline")
             self.invite_list = ui.column()
 
         with ui.card().classes("w-full max-w-xl p-4"):
-            ui.label("My tasks").classes("text-lg font-semibold")
+            ui.label("My incomplete tasks").classes("text-lg font-semibold")
             self.task_list = ui.column()
 
         with ui.card().classes("w-full max-w-xl p-4"):
@@ -119,7 +97,10 @@ class CollaborationDesk:
     def refresh_my_tasks_dropdown(self) -> None:
         with get_db_context() as db:
             items = db.exec(
-                select(Item).where(Item.owner_id == self.current_user_id)
+                select(Item).where(
+                    Item.owner_id == self.current_user_id,
+                    Item.completed == False,
+                )
             ).all()
 
         self.task_options = {
@@ -128,29 +109,36 @@ class CollaborationDesk:
         }
 
         self.task_select.options = list(self.task_options.keys())
+        self.task_select.value = None
         self.task_select.update()
 
         if not self.task_options:
-            self.result_label.text = "You do not have any tasks to share yet."
+            self.result_label.text = "You do not have any incomplete tasks to share yet."
+        else:
+            self.result_label.text = "Task list refreshed."
+
+        self.refresh_tasks()
 
     def refresh_tasks(self) -> None:
         self.task_list.clear()
 
         with get_db_context() as db:
             items = db.exec(
-                select(Item).where(Item.owner_id == self.current_user_id)
+                select(Item).where(
+                    Item.owner_id == self.current_user_id,
+                    Item.completed == False,
+                )
             ).all()
 
+        with self.task_list:
             if not items:
-                with self.task_list:
-                    ui.label("No tasks on your home screen yet.").classes("text-slate-500")
+                ui.label("No incomplete tasks on your home screen yet.").classes("text-slate-500")
                 return
 
-            with self.task_list:
-                for item in items:
-                    ui.label(
-                        f"Task: {item.title} | Category: {item.category} | Completed: {item.completed}"
-                    )
+            for item in items:
+                ui.label(
+                    f"Task: {item.title} | Category: {item.category} | Completed: {item.completed}"
+                )
 
     def refresh_invites(self) -> None:
         self.invite_list.clear()
@@ -171,9 +159,7 @@ class CollaborationDesk:
                     task_title = task.name if task else "Unknown task"
 
                     with ui.row().classes("items-center gap-2 flex-wrap"):
-                        ui.label(
-                            f"{invite.sender} invited you to '{task_title}'"
-                        )
+                        ui.label(f"{invite.sender} invited you to '{task_title}'")
 
                         ui.button(
                             "Accept",
@@ -209,6 +195,9 @@ class CollaborationDesk:
             )
 
         self.receiver_email_input.value = ""
+        self.receiver_email_input.update()
+
+        self.refresh_my_tasks_dropdown()
         self.refresh_invites()
 
     def accept_invite_gui(self, invite_id: int) -> None:
@@ -232,6 +221,8 @@ class CollaborationDesk:
             )
 
         self.refresh_invites()
+
+
 @ui.page("/collaboration")
 def collaboration_page() -> None:
     if not guard_authenticated():
