@@ -31,8 +31,10 @@ class User(UserBase, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     hashed_password: str
-    distraction_block_start: str = Field(default="10:30", max_length=5)
-    distraction_block_end: str = Field(default="20:00", max_length=5)
+    distraction_block_start: str = Field(
+        default="10:30", max_length=5
+    )  # UTC wall time HH:MM
+    distraction_block_end: str = Field(default="20:00", max_length=5)  # UTC wall time HH:MM
     items: list["Item"] = Relationship(back_populates="owner")
     weekly_schedule_entries: list["WeeklyScheduleEntry"] = Relationship(
         back_populates="owner"

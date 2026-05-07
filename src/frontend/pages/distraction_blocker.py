@@ -15,6 +15,8 @@ from src.productivity.blocker_schedule import (
     ampm_parts_to_hhmm,
     hhmm_to_ampm_parts,
     is_valid_hhmm,
+    local_window_to_utc_hhmm_pair,
+    utc_window_to_local_hhmm_pair,
 )
 from src.repositories.blocked_site import blocked_site_repo
 from src.repositories.user import user_repo
@@ -37,8 +39,21 @@ def _normalize_hostname(raw: str) -> str:
     return s
 
 
+async def _browser_timezone() -> str:
+    try:
+        tz = await ui.run_javascript(
+            "return Intl.DateTimeFormat().resolvedOptions().timeZone",
+            timeout=5.0,
+        )
+        if isinstance(tz, str) and tz.strip():
+            return tz.strip()
+    except Exception:
+        pass
+    return "UTC"
+
+
 @ui.page("/distraction-blocker")
-def distraction_blocker_page() -> None:
+async def distraction_blocker_page() -> None:
     if not guard_authenticated():
         return
 
@@ -52,7 +67,8 @@ def distraction_blocker_page() -> None:
             ui.label("Blocking schedule").classes("text-h6 text-emerald-700 dark:text-emerald-300")
             ui.label(
                 "When should distractions be blocked? If “from” is later than “to”, "
-                "the window crosses midnight (e.g. 10:00 PM → 6:00 AM)."
+                "the window crosses midnight (e.g. 10:00 PM → 6:00 AM). "
+                "Times follow your browser’s timezone; they are stored and checked in UTC."
             ).classes("text-caption text-slate-500 mt-1 mb-4")
 
             with ui.row().classes("w-full flex-wrap items-end gap-4"):
@@ -79,12 +95,18 @@ def distraction_blocker_page() -> None:
                 )
                 end_ap = ui.select(["AM", "PM"], value="PM", label="").classes("min-w-[88px]")
 
-            def load_schedule_from_user() -> None:
+            async def load_schedule_from_user() -> None:
                 try:
+                    tz = await _browser_timezone()
                     with get_db_context() as db:
                         user = get_current_user_from_state(db)
-                        sh, sm, sap = hhmm_to_ampm_parts(user.distraction_block_start)
-                        eh, em, eap = hhmm_to_ampm_parts(user.distraction_block_end)
+                        s_local, e_local = utc_window_to_local_hhmm_pair(
+                            user.distraction_block_start,
+                            user.distraction_block_end,
+                            tz,
+                        )
+                    sh, sm, sap = hhmm_to_ampm_parts(s_local)
+                    eh, em, eap = hhmm_to_ampm_parts(e_local)
                     start_h.value = sh
                     start_m.value = sm
                     start_ap.value = sap
@@ -94,7 +116,7 @@ def distraction_blocker_page() -> None:
                 except HTTPException:
                     pass
 
-            def save_schedule() -> None:
+            async def save_schedule() -> None:
                 try:
                     s_hhmm = ampm_parts_to_hhmm(
                         int(start_h.value),
@@ -112,11 +134,13 @@ def distraction_blocker_page() -> None:
                 if not is_valid_hhmm(s_hhmm) or not is_valid_hhmm(e_hhmm):
                     notifications.show_error("Invalid time; use hours 1–12 and minutes 0–59.")
                     return
+                tz = await _browser_timezone()
+                s_utc, e_utc = local_window_to_utc_hhmm_pair(s_hhmm, e_hhmm, tz)
                 try:
                     with get_db_context() as db:
                         user = get_current_user_from_state(db)
                         user_repo.update_distraction_schedule(
-                            db, user=user, start=s_hhmm, end=e_hhmm
+                            db, user=user, start=s_utc, end=e_utc
                         )
                     notifications.show_success("Schedule saved.")
                 except HTTPException as e:
@@ -195,4 +219,4 @@ def distraction_blocker_page() -> None:
 
             refresh_site_rows()
 
-        load_schedule_from_user()
+        await load_schedule_from_user()

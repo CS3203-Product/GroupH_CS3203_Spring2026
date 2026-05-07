@@ -50,7 +50,7 @@ class UserRepository:
     def update_distraction_schedule(
         self, db: Session, *, user: User, start: str, end: str
     ) -> User:
-        """Persist distraction blocker active window (24h HH:MM strings)."""
+        """Persist distraction blocker window as UTC 24h ``HH:MM`` strings."""
         user.distraction_block_start = start
         user.distraction_block_end = end
         db.add(user)

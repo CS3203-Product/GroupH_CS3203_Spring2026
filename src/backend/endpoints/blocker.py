@@ -1,7 +1,7 @@
 """Distraction blocker API: blocked sites in Postgres + JWT auth."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from DistractionBlocker import DistractionBlocker
 from fastapi import APIRouter, Depends, HTTPException
@@ -90,7 +90,7 @@ def check_url(
     logger.debug("check-url sites owner_id=%s sites=%s", owner_id, sites)
     print("check-url sites owner_id=%s sites=%s", owner_id, sites)
     blocker.set_blocked_sites(sites)
-    current_time = datetime.now().strftime("%H:%M")
+    current_time = datetime.now(timezone.utc).strftime("%H:%M")
     print(
         "check-url owner_id=%s url=%s current_time=%s user_db=%s blocked_urls=%s",
         owner_id,
