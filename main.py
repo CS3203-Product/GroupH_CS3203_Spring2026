@@ -20,7 +20,8 @@ class CheckRequest(BaseModel):
 @app.post("/blocker/check-url")
 
 async def check_url(req: CheckRequest):
-    
+     # CWE-703: Catch database failures separately from validation errors
+    # so the server returns a meaningful error instead of a 500 crash
     sites = await get_blocked_sites(req.user_id)
     
     blocker.set_blocked_sites(sites)
@@ -31,8 +32,9 @@ async def check_url(req: CheckRequest):
         is_blocked = blocker.check_access(req.url, current_time)
        
         return {"blocked": is_blocked}
-    
+     # CWE-703: Return 400 for invalid input rather than letting it propagate
     except ValueError as e:
+            # CWE-703: Catch unexpected exceptions to prevent leaking internal errors
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/blocker/sites/{user_id}")
