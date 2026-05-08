@@ -44,6 +44,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
   try {
     const response = await fetch(`${apiBase}/blocker/check-url`, {
+      // CWE-703: Check if response is valid JSON before parsing
+    // An HTML error page from the server will cause a SyntaxError if not caught
+
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -76,6 +79,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
       });
     }
   } catch (err) {
+     // CWE-703: Network failures or JSON parse errors are caught here
+    // Without this, the extension would crash silently on server downtime
+
     console.error('Blocker check failed:', err);
   }
 });

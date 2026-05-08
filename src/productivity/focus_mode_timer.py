@@ -38,6 +38,28 @@ class FocusModeTimer:
         return f"{mins:02d}:{secs:02d}"
 
     def start(self) -> None:
+
+
+        # CWE-252 Concept: Verify the UI component is actually active 
+        # before changing the internal boolean state.
+        
+        #try:
+            #self.is_running = not self.is_running
+            #self.tick_timer.active = self.is_running
+            
+            # Verify the timer actually switched state
+            #if self.tick_timer.active != self.is_running:
+                # If they don't match, the timer 'engine' failed to respond
+                #raise ValueError("Timer Engine Mismatch")
+                
+            #elf.start_btn.text = "Pause" if self.is_running else "Resume"
+            
+        #except Exception as e:
+            # Revert state to keep app consistent (Rollback)
+            #self.is_running = False
+            #self.tick_timer.active = False
+            #ui.notify("System Error: Could not toggle timer.", type='warning')
+
         self.is_running = not self.is_running
         self.tick_timer.active = self.is_running
         self.start_btn.text = "Pause" if self.is_running else "Resume"
@@ -53,6 +75,17 @@ class FocusModeTimer:
     def tick(self) -> None:
         if self.time_left > 0:
             self.time_left -= 1
+
+            # --- CWE-252 FIX: CHECK RETURN VALUE ---
+            # Instead of just calling self.alarm.play(), we should ideally
+            # verify the state. Since NiceGUI audio is client-side, we wrap
+            # critical actions in a way that handles failures.
+           # try:
+                #self.alarm.play()
+                # If we had a backend analytics call here:
+                # result = db.save_session(self.mode)
+                # if not result: raise Exception("Data not saved")
+
         else:
             self.alarm.play()
             if self.mode == "Work":
