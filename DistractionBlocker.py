@@ -10,11 +10,11 @@ class DistractionBlocker:
     def set_blocked_sites(self, sites):
         
         self.blocked_sites = sites
-
+    #CWE-703: Validate URL inputs before processing to prevent unexpected crashse
     def check_access(self, url, current_time, window_start="10:30", window_end="20:00"):
         if not url or not url.strip():
             raise ValueError("URL cannot be empty.")
-
+    #CWE-703: wrap time sparsing in try/except. Malformed time strings will crash without it
         hours, minutes = map(int, current_time.split(":"))
         total_minutes = hours * 60 + minutes
 
