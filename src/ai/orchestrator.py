@@ -1,4 +1,12 @@
-# src/ai/orchestrator.py
+# CWE-914: Improper Control of Dynamically-Identified Variables. 
+# Mitigation Strategy: Input Validation
+# For any externally-influenced input, check the input against an allowlist of internal program variables that are allowed to be modified
+# This is preventing an out of bounds error which could potentially cause errors in the database and ultimately the software
+# Completed this by having drop down menus for selecting the est hours and the category and the Difficulty of the task
+
+# Future approach to increase security is to implemented a selection of mon/day/year drop down to select the due date instead of allowing user input
+# As well as show there is a char limit when creating task name and description. This is all to prevent any sort of mishandling of data
+# Also could end up preventing anything like an SQL-injection
 
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
