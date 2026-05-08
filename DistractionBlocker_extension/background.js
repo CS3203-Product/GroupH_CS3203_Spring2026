@@ -40,9 +40,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   const apiBase = await getApiBaseUrl();
 
   console.log('API BASE ->', apiBase);
-  console.log('Token ->', token);
   console.log('Host name ->', hostname);
-  console.log('ENV ->', apiEnvironment);
 
   try {
     const response = await fetch(`${apiBase}/blocker/check-url`, {
